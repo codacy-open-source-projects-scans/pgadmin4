@@ -16,7 +16,8 @@ import operator
 from flask import render_template, request, current_app, \
     url_for, Response
 from flask_babel import gettext
-from flask_security import login_required, current_user
+from flask_security import current_user
+from pgadmin.user_login_check import pga_login_required
 from pgadmin.misc.bgprocess.processes import BatchProcess, IProcessDesc
 from pgadmin.utils import PgAdminModule, get_storage_directory, html, \
     fs_short_path, document_dir, does_utility_exist, get_server, \
@@ -177,13 +178,13 @@ class BackupMessage(IProcessDesc):
 
 
 @blueprint.route("/")
-@login_required
+@pga_login_required
 def index():
     return bad_request(errormsg=gettext("This URL cannot be called directly."))
 
 
 @blueprint.route("/backup.js")
-@login_required
+@pga_login_required
 def script():
     """render own javascript"""
     return Response(
@@ -236,10 +237,13 @@ def _get_args_params_values(data, conn, backup_obj_type, backup_file, server,
             return
         val = data.get(key, default_value)
         if val:
-            val = val.split()
-            for c_val in val:
-                args.append(param)
-                args.append(c_val)
+            if isinstance(val, list):
+                for c_val in val:
+                    args.append(param)
+                    args.append(c_val)
+                return
+            args.append(param)
+            args.append(val)
 
     if backup_obj_type != 'objects':
         args.append('--database')
@@ -317,7 +321,6 @@ def _get_args_params_values(data, conn, backup_obj_type, backup_file, server,
     set_param('use_column_inserts', '--column-inserts')
     set_param('load_via_partition_root', '--load-via-partition-root',
               manager.version >= 110000)
-    set_param('with_oids', '--oids')
     set_param('enable_row_security', '--enable-row-security')
     set_value('exclude_table_data', '--exclude-table-data')
     set_value('table_and_children', '--table-and-children', None,
@@ -389,7 +392,7 @@ def _get_args_params_values(data, conn, backup_obj_type, backup_file, server,
 @blueprint.route(
     '/job/<int:sid>/object', methods=['POST'], endpoint='create_object_job'
 )
-@login_required
+@pga_login_required
 def create_backup_objects_job(sid):
     """
     Args:
@@ -496,7 +499,7 @@ def create_backup_objects_job(sid):
 @blueprint.route(
     '/utility_exists/<int:sid>/<backup_obj_type>', endpoint='utility_exists'
 )
-@login_required
+@pga_login_required
 def check_utility_exists(sid, backup_obj_type):
     """
     This function checks the utility file exist on the given path.
@@ -538,7 +541,7 @@ def check_utility_exists(sid, backup_obj_type):
 @blueprint.route(
     '/objects/<int:sid>/<int:did>/<int:scid>', endpoint='schema_objects'
 )
-@login_required
+@pga_login_required
 def objects(sid, did, scid=None):
     """
     This function returns backup objects
