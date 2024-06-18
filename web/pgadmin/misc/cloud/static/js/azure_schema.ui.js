@@ -13,7 +13,7 @@ import { isEmptyString } from 'sources/validators';
 import pgAdmin from 'sources/pgadmin';
 
 class AzureCredSchema extends BaseUISchema {
-  constructor(fieldOptions = {}, initValues = {}, eventBus) {
+  constructor(eventBus, fieldOptions = {}, initValues = {}) {
     super({
       oid: null,
       auth_type: 'interactive_browser_credential',
@@ -122,7 +122,7 @@ class AzureCredSchema extends BaseUISchema {
                   }));
                 })
                 .catch((err)=>{
-                  reject(err);
+                  reject(err instanceof Error ? err : Error(gettext('Something went wrong')));
                 });
             }
           });
@@ -152,7 +152,7 @@ class AzureCredSchema extends BaseUISchema {
                   });
                 })
                 .catch((err)=>{
-                  reject(err);
+                  reject(err instanceof Error ? err : Error(gettext('Something went wrong')));
                 });
             }
           });
@@ -717,7 +717,7 @@ class AzureClusterSchema extends BaseUISchema {
   }
 
   validate(data, setErr) {
-    if ( !isEmptyString(data.name) && (!/^[a-z0-9\-]*$/.test(data.name) || data.name.length < 3)) {
+    if ( !isEmptyString(data.name) && (!/^[a-z0-9-]*$/.test(data.name) || data.name.length < 3)) {
       setErr('name',gettext('Name must be more than 2 characters and must only contain lowercase letters, numbers, and hyphens'));
       return true;
     }

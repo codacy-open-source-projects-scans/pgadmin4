@@ -91,7 +91,7 @@ define('pgadmin.node.cast', [
                     resolve(data);
                   })
                   .catch((err)=>{
-                    reject(err);
+                    reject(err instanceof Error ? err : Error(gettext('Something went wrong')));
                   });
               } else {
                 data = [];

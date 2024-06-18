@@ -7,6 +7,7 @@
 //
 //////////////////////////////////////////////////////////////
 import React from 'react';
+import { Box } from '@mui/material';
 import { styled } from '@mui/material/styles';
 import SchemaView from '../../../../static/js/SchemaView';
 import BaseUISchema from '../../../../static/js/SchemaView/base_schema.ui';
@@ -22,10 +23,10 @@ import { showChangeOwnership } from '../../../../static/js/Dialogs/index';
 import { BROWSER_PANELS } from '../../../../browser/static/js/constants';
 import _ from 'lodash';
 
-const StyledSchemaView = styled(SchemaView)(({theme}) => ({
+const StyledBox = styled(Box)(() => ({
+  height: '100%',
   '& .UserManagementDialog-root': {
-    ...theme.mixins.tabPanel,
-    padding: 0,
+    padding: 0 + ' !important',
   }
 }));
 
@@ -166,10 +167,10 @@ class UserManagementCollection extends BaseUISchema {
 
     if (state.auth_source != AUTH_METHODS['INTERNAL']) {
       if (obj.isNew(state) && obj.top?._sessData?.userManagement) {
-        for (let i=0; i < obj.top._sessData.userManagement.length; i++) {
-          if (obj.top._sessData.userManagement[i]?.id &&
-            obj.top._sessData.userManagement[i].username.toLowerCase() == state.username.toLowerCase() &&
-            obj.top._sessData.userManagement[i].auth_source == state.auth_source) {
+        for (let user in obj.top._sessData.userManagement) {
+          if (user?.id &&
+            user.username.toLowerCase() == state.username.toLowerCase() &&
+            user.auth_source == state.auth_source) {
             msg = gettext('User name \'%s\' already exists', state.username);
             setError('username', msg);
             return true;
@@ -179,7 +180,7 @@ class UserManagementCollection extends BaseUISchema {
     }
 
     if (state.auth_source == AUTH_METHODS['INTERNAL']) {
-      let email_filter = /^[a-zA-Z0-9.!#$%&'*+\/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$/;
+      let email_filter = /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$/;
       if (isEmptyString(state.email)) {
         msg = gettext('Email cannot be empty');
         setError('email', msg);
@@ -193,9 +194,9 @@ class UserManagementCollection extends BaseUISchema {
       }
 
       if (obj.isNew(state) && obj.top?._sessData?.userManagement) {
-        for (let i=0; i < obj.top._sessData.userManagement.length; i++) {
-          if (obj.top._sessData.userManagement[i]?.id &&
-            obj.top._sessData.userManagement[i].email?.toLowerCase() == state.email?.toLowerCase()) {
+        for (let user in obj.top._sessData.userManagement) {
+          if (user?.id &&
+            user.email?.toLowerCase() == state.email?.toLowerCase()) {
             msg = gettext('Email address \'%s\' already exists', state.email);
             setError('email', msg);
             return true;
@@ -363,7 +364,7 @@ function UserManagementDialog({onClose}) {
             onClose();
           })
           .catch((err)=>{
-            reject(err);
+            reject(err instanceof Error ? err : Error(gettext('Something went wrong')));
           });
       } catch (error) {
         reject(parseApiError(error));
@@ -393,7 +394,7 @@ function UserManagementDialog({onClose}) {
     window.open(url_for('help.static', { 'filename': 'user_management.html' }), 'pgadmin_help');
   };
 
-  return <StyledSchemaView
+  return <StyledBox><SchemaView
     formType={'dialog'}
     getInitData={()=>{ return new Promise((resolve, reject)=>{
       api.get(url_for('user_management.users'))
@@ -401,7 +402,7 @@ function UserManagementDialog({onClose}) {
           resolve({userManagement:res.data});
         })
         .catch((err)=>{
-          reject(err);
+          reject(err instanceof Error ? err : Error(gettext('Something went wrong')));
         });
     }); }}
     schema={new UserManagementSchema(authSourcesOptions, roleOptions)}
@@ -415,7 +416,7 @@ function UserManagementDialog({onClose}) {
     disableSqlHelp={true}
     isTabView={false}
     formClassName='UserManagementDialog-root'
-  />;
+  /></StyledBox>;
 }
 
 UserManagementDialog.propTypes = {

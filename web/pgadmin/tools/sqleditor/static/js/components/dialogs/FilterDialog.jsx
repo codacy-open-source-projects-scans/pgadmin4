@@ -88,7 +88,7 @@ export default function FilterDialog({onClose, onSave}) {
           filterSchemaObj.setColumnOptions((columns||[]).map((c)=>({label: c, value: c})));
           resolve(filterData);
         } catch (error) {
-          reject(error);
+          reject(error instanceof Error ? error : Error(gettext('Something went wrong')));
         }
       };
       getFilterData();
@@ -106,10 +106,10 @@ export default function FilterDialog({onClose, onSave}) {
             resolve();
             onSave();
           } else {
-            reject(respData.data.result);
+            reject(new Error(respData.data.result));
           }
         } catch (error) {
-          reject(error);
+          reject(error instanceof Error ? error : Error(gettext('Something went wrong')));
         }
       };
       setFilterData();

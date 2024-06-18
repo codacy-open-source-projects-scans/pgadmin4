@@ -265,7 +265,7 @@ define([
               }).then((response)=> {
                 resolve(response.data.data);
               }).catch((err)=>{
-                reject(err);
+                reject(err instanceof Error ? err : Error(gettext('Something went wrong')));
               });
             });
           }}

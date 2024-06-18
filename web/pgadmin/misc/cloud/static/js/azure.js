@@ -25,7 +25,7 @@ export function AzureCredentials(props) {
 
   let _eventBus = React.useContext(CloudWizardEventsContext);
   React.useMemo(() => {
-    const azureCloudDBCredSchema = new AzureCredSchema({
+    const azureCloudDBCredSchema = new AzureCredSchema(_eventBus, {
       authenticateAzure:(auth_type, azure_tenant_id) => {
         let loading_icon_url = url_for(
           'static', { 'filename': 'img/loading.gif'}
@@ -72,12 +72,12 @@ export function AzureCredentials(props) {
               })
               .catch((error)=>{
                 clearInterval(interval);
-                reject(error);
+                reject(error instanceof Error ? error : Error(gettext('Something went wrong')));
               });
           }, 1000);
         });
       }
-    }, {}, _eventBus);
+    }, {});
     setCloudDBCredInstance(azureCloudDBCredSchema);
   }, [props.cloudProvider]);
 
@@ -273,7 +273,7 @@ export function checkClusternameAvailbility(clusterName){
         resolve(res.data);
       }
     }).catch((error) => {
-      reject(gettext(`Error while checking server name availability with Microsoft Azure: ${error.response.data.errormsg}`));
+      reject(new Error(gettext(`Error while checking server name availability with Microsoft Azure: ${error.response.data.errormsg}`)));
     });
   });
 }

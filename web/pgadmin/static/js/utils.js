@@ -23,8 +23,22 @@ export function parseShortcutValue(obj) {
   }
   if (obj.alt) { shortcut += 'alt+'; }
   if (obj.shift) { shortcut += 'shift+'; }
-  if (obj.control) { shortcut += 'ctrl+'; }
+  if (isMac() && obj.ctrl_is_meta) { shortcut += 'meta+'; }
+  else if (obj.control) { shortcut += 'ctrl+'; }
   shortcut += obj?.key.char?.toLowerCase();
+  return shortcut;
+}
+
+export function parseKeyEventValue(e) {
+  let shortcut = '';
+  if(!e) {
+    return null;
+  }
+  if (e.altKey) { shortcut += 'alt+'; }
+  if (e.shiftKey) { shortcut += 'shift+'; }
+  if (isMac() && e.metaKey) { shortcut += 'meta+'; }
+  else if (e.ctrlKey) { shortcut += 'ctrl+'; }
+  shortcut += e.key.toLowerCase();
   return shortcut;
 }
 
@@ -363,7 +377,7 @@ export function evalFunc(obj, func, ...param) {
 }
 
 export function getBrowser() {
-  let ua=navigator.userAgent,tem,M=ua.match(/(opera|chrome|safari|firefox|msie|trident(?=\/))\/?\s*(\d+)/i) || [];
+  let ua=navigator.userAgent,tem,M=(/(opera|chrome|safari|firefox|msie|trident(?=\/))\/?\s*(\d+)/i).exec(ua) || [];
   if(/trident/i.test(M[1])) {
     tem=/\brv[ :]+(\d+)/g.exec(ua) || [];
     return {name:'IE', version:(tem[1]||'')};
@@ -374,12 +388,12 @@ export function getBrowser() {
   }
 
   if(M[1]==='Chrome') {
-    tem=ua.match(/\bOPR|Edge\/(\d+)/);
+    tem=(/\bOPR|Edge\/(\d+)/).exec(ua);
     if(tem!=null) {return {name:tem[0], version:tem[1]};}
   }
 
   M=M[2]? [M[1], M[2]]: [navigator.appName, navigator.appVersion, '-?'];
-  if((tem=ua.match(/version\/(\d+)/i))!=null) {M.splice(1,1,tem[1]);}
+  if((tem=(/version\/(\d+)/i).exec(ua))!=null) {M.splice(1,1,tem[1]);}
   return {
     name: M[0],
     version: M[1],
@@ -578,7 +592,7 @@ export function pgHandleItemError(error, args) {
 
 export function fullHexColor(shortHex) {
   if(shortHex?.length == 4) {
-    return shortHex.replace(RegExp('#([0-9a-fA-F])([0-9a-fA-F])([0-9a-fA-F])'), '#$1$1$2$2$3$3').toUpperCase();
+    return shortHex.replace(/#([0-9a-fA-F])([0-9a-fA-F])([0-9a-fA-F])/, '#$1$1$2$2$3$3').toUpperCase();
   }
   return shortHex;
 }

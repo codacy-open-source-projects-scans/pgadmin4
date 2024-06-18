@@ -8,7 +8,6 @@
 //////////////////////////////////////////////////////////////
 
 import React from 'react';
-import { styled } from '@mui/material/styles';
 import pgAdmin from 'sources/pgadmin';
 import { getNodeAjaxOptions, getNodeListById } from 'pgbrowser/node_ajax';
 import {CloudInstanceDetailsSchema, CloudDBCredSchema, DatabaseSchema} from './aws_schema.ui';
@@ -18,13 +17,6 @@ import getApiInstance from '../../../../static/js/api_instance';
 import { isEmptyString } from 'sources/validators';
 import PropTypes from 'prop-types';
 import gettext from 'sources/gettext';
-
-const StyledSchemaView= styled(SchemaView)(() => 
-  ({
-    '& .aws-formClass': {
-      overflow: 'auto',
-    }
-  }));
 
 // AWS credentials
 export function AwsCredentials(props) {
@@ -90,7 +82,7 @@ export function AwsInstanceDetails(props) {
                 resolve(data);
               })
               .catch((err)=>{
-                reject(err);
+                reject(err instanceof Error ? err : Error(gettext('Something went wrong')));
               });
           } else {
             resolve(options);
@@ -113,7 +105,7 @@ export function AwsInstanceDetails(props) {
   }, [props.cloudProvider]);
 
 
-  return  <StyledSchemaView
+  return  <SchemaView
     formType={'dialog'}
     getInitData={() => { /*This is intentional (SonarQube)*/ }}
     viewHelperProps={{ mode: 'create' }}
@@ -123,7 +115,6 @@ export function AwsInstanceDetails(props) {
     onDataChange={(isChanged, changedData) => {
       props.setCloudInstanceDetails(changedData);
     }}
-    formClassName='aws-formClass'
   />;
 }
 AwsInstanceDetails.propTypes = {
@@ -248,8 +239,7 @@ export function getAWSSummary(cloud, cloudInstanceDetails, cloudDBDetails) {
 }
 
 const getStorageType = (cloudInstanceDetails) => {
-  let _storage_type = 'General Purpose SSD (gp2)',
-    _io1 = undefined;
+  let _storage_type = 'General Purpose SSD (gp2)', _io1;
 
   if(cloudInstanceDetails.storage_type == 'gp2'){ _storage_type = 'General Purpose SSD (gp2)';}
   else if (cloudInstanceDetails.storage_type == 'gp3'){ _storage_type = 'General Purpose SSD (gp3)';}

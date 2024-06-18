@@ -15,7 +15,7 @@ import { SaveDataIcon, CommitIcon, RollbackIcon, ViewDataIcon } from '../../../.
 import { InputSwitch } from '../../../../../../static/js/components/FormComponents';
 import CodeMirror from '../../../../../../static/js/components/ReactCodeMirror';
 import { DefaultButton } from '../../../../../../static/js/components/Buttons';
-import { useDelayedCaller } from '../../../../../../static/js/custom_hooks';
+import { useDelayedCaller, useForceUpdate } from '../../../../../../static/js/custom_hooks';
 import Loader from 'sources/components/Loader';
 import { LayoutDockerContext, LAYOUT_EVENTS } from '../../../../../../static/js/helpers/Layout';
 import PropTypes from 'prop-types';
@@ -24,9 +24,11 @@ import * as clipboard from '../../../../../../static/js/clipboard';
 import EmptyPanelMessage from '../../../../../../static/js/components/EmptyPanelMessage';
 
 const Root = styled('div')(({ theme }) => ({
-  display: 'flex', 
+  display: 'flex',
   height: '100%',
   '.QuerySources-leftRoot': {
+    flexBasis: '50%',
+    maxWidth: '50%',
     display: 'flex',
     flexDirection: 'column',
     backgroundColor: theme.otherVars.editorToolbarBg,
@@ -34,7 +36,10 @@ const Root = styled('div')(({ theme }) => ({
     '& .QuerySources-header': {
       padding: '0.25rem',
       display: 'flex',
-      flexWrap: 'wrap'
+      flexWrap: 'wrap',
+      '& .QuerySources-removeBtnMargin': {
+        marginLeft: '0.25rem',
+      },
     },
     '& .QuerySources-listRoot': {
       ...theme.mixins.panelBorder.top,
@@ -78,9 +83,6 @@ const Root = styled('div')(({ theme }) => ({
     },
     '& .QuerySources-queryMargin': {
       marginTop: '12px',
-    },
-    '& .QuerySources-removeBtnMargin': {
-      marginLeft: '0.25rem',
     },
   },
   '& .QuerySources-infoHeader': {
@@ -266,8 +268,8 @@ QuerySourceIcon.propTypes = {
 };
 
 function HistoryEntry({entry, formatEntryDate, itemKey, selectedItemKey, onClick}) {
-  return <Root><ListItem tabIndex="0" data-label="history-entry" data-pgadmin={entry.is_pgadmin_query} ref={(ele)=>{
-    selectedItemKey==itemKey && ele && ele.scrollIntoView({
+  return <ListItem tabIndex="0" data-label="history-entry" data-pgadmin={entry.is_pgadmin_query} ref={(ele)=>{
+    selectedItemKey==itemKey && ele?.scrollIntoView({
       block: 'center',
       behavior: 'smooth',
     });
@@ -279,8 +281,7 @@ function HistoryEntry({entry, formatEntryDate, itemKey, selectedItemKey, onClick
     <Box fontSize="12px">
       {formatEntryDate(entry.start_time)}
     </Box>
-  </ListItem>
-  </Root>;
+  </ListItem>;
 }
 
 const EntryPropType = PropTypes.shape({
@@ -321,15 +322,13 @@ function QueryHistoryDetails({entry}) {
   }, [entry]);
 
   if(!entry) {
-    return <Root>
-      <Box display="flex" height="100%">
-        <EmptyPanelMessage text={gettext('Select an history entry to see details.')} />
-      </Box>
-    </Root>;
+    return <Box display="flex" height="100%">
+      <EmptyPanelMessage text={gettext('Select an history entry to see details.')} />
+    </Box>;
   }
 
   return (
-    <Root>
+    <>
       {entry.info && <Box className='QuerySources-infoHeader'>{entry.info}</Box>}
       <Box padding="0.5rem" data-label="history-detail">
         <Grid container>
@@ -361,7 +360,7 @@ function QueryHistoryDetails({entry}) {
           <Box className='QuerySources-fontSourceCode' fontSize="13px" whiteSpace="pre-wrap">{_.isObject(entry.message) ? JSON.stringify(entry.message) : entry.message}</Box>
         </Box>
       </Box>
-    </Root>
+    </>
   );
 }
 
@@ -377,7 +376,7 @@ export function QueryHistory() {
   const eventBus = React.useContext(QueryToolEventsContext);
   const [selectedItemKey, setSelectedItemKey] = React.useState(1);
   const [showInternal, setShowInternal] = React.useState(true);
-  const [, setRefresh] = React.useState(false);
+  const forceUpdate = useForceUpdate();
   const [loaderText, setLoaderText] = React.useState('');
   const selectedEntry = qhu.current.getEntry(selectedItemKey);
   const layoutDocker = useContext(LayoutDockerContext);
@@ -425,7 +424,7 @@ export function QueryHistory() {
         };
       }
       qhu.current.addEntry(h);
-      setRefresh((prev)=>!prev);
+      forceUpdate();
     };
 
     listRef.current?.focus();
@@ -491,11 +490,11 @@ export function QueryHistory() {
     <Root>
       <Loader message={loaderText} />
       {React.useMemo(()=>(
-        <Box display="flex" height="100%">
+        <>
           {qhu.current.size() == 0 ?
             <EmptyPanelMessage text={gettext('No history found')} />:
             <>
-              <Box flexBasis="50%" maxWidth="50%" className='QuerySources-leftRoot'>
+              <Box className='QuerySources-leftRoot'>
                 <Box className='QuerySources-header'>
                   <Box marginRight="auto">
                     {gettext('Show queries generated internally by pgAdmin?')}
@@ -531,7 +530,7 @@ export function QueryHistory() {
                 <QueryHistoryDetails entry={selectedEntry}/>
               </Box>
             </>}
-        </Box>
+        </>
       ), [selectedItemKey, showInternal, qhu.current.size()])}
     </Root>
   );

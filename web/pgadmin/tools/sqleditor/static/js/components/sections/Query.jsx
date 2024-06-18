@@ -16,7 +16,7 @@ import { LayoutDockerContext, LAYOUT_EVENTS } from '../../../../../../static/js/
 import ConfirmSaveContent from '../../../../../../static/js/Dialogs/ConfirmSaveContent';
 import gettext from 'sources/gettext';
 import { isMac } from '../../../../../../static/js/keyboard_shortcuts';
-import { checkTrojanSource, isShortcutValue, toCodeMirrorKey } from '../../../../../../static/js/utils';
+import { checkTrojanSource, isShortcutValue, parseKeyEventValue, parseShortcutValue } from '../../../../../../static/js/utils';
 import { parseApiError } from '../../../../../../static/js/api_instance';
 import { usePgAdmin } from '../../../../../../static/js/BrowserComponent';
 import ConfirmPromotionContent from '../dialogs/ConfirmPromotionContent';
@@ -50,7 +50,7 @@ async function registerAutocomplete(editor, api, transId) {
         })
         .catch((err) => {
           onAvailable();
-          reject(err);
+          reject(err instanceof Error ? err : Error(gettext('Something went wrong')));
         });
     });
   });
@@ -136,11 +136,11 @@ export default function Query({onTextSelect}) {
     }
   };
 
-  const triggerExecution = (executeCursor=false, explainObject, macroSQL)=>{
+  const triggerExecution = (explainObject, macroSQL, executeCursor=false)=>{
     if(queryToolCtx.params.is_query_tool) {
       let external = null;
       let query = editor.current?.getSelection();
-      if(!_.isUndefined(macroSQL)) {
+      if(!_.isEmpty(macroSQL)) {
         const regex = /\$SELECTION\$/gi;
         query =  macroSQL.replace(regex, query);
         external = true;
@@ -174,7 +174,7 @@ export default function Query({onTextSelect}) {
         editor.current.removeErrorMark();
       }
     });
-    
+
 
     eventBus.registerListener(QUERY_TOOL_EVENTS.LOAD_FILE, (fileName, storage)=>{
       queryToolCtx.api.post(url_for('sqleditor.load_file'), {
@@ -339,7 +339,7 @@ export default function Query({onTextSelect}) {
     const formatSQL = ()=>{
       let selection = true, sql = editor.current?.getSelection();
       /* New library does not support capitalize casing
-        so if a user has set capitalize casing we will 
+        so if a user has set capitalize casing we will
         use preserve casing which is default for the library.
       */
       let formatPrefs = {
@@ -445,7 +445,7 @@ export default function Query({onTextSelect}) {
         text={query}
         onContinue={(formData)=>{
           preferencesStore.setPreference(formData);
-          eventBus.fireEvent(QUERY_TOOL_EVENTS.TRIGGER_EXECUTION,true);
+          eventBus.fireEvent(QUERY_TOOL_EVENTS.TRIGGER_EXECUTION, null, '', true);
         }}
         onClose={()=>{
           closeModal?.();
@@ -470,26 +470,33 @@ export default function Query({onTextSelect}) {
     ()=>{
       // omit CM internal shortcuts
       const queryToolPref = _.omit(queryToolCtx.preferences.sqleditor, ['indent', 'unindent', 'comment']);
-      return Object.values(queryToolPref)
+      const queryToolShortcuts = Object.values(queryToolPref)
         .filter((p)=>isShortcutValue(p))
-        .map((p)=>({
-          key: toCodeMirrorKey(p), run: (_v, e)=>{
-            queryToolCtx.mainContainerRef?.current?.dispatchEvent(new KeyboardEvent('keydown', {
-              which: e.which,
-              keyCode: e.keyCode,
-              altKey: e.altKey,
-              shiftKey: e.shiftKey,
-              ctrlKey: e.ctrlKey,
-              metaKey: e.metaKey,
-            }));
-            if(toCodeMirrorKey(p) == 'Mod-k') {
+        .map((p)=>parseShortcutValue(p));
+
+      return [{
+        any: (_v, e)=>{
+          const eventStr = parseKeyEventValue(e);
+          if(queryToolShortcuts.includes(eventStr)) {
+            if((isMac() && eventStr == 'meta+k') || eventStr == 'ctrl+k') {
               eventBus.fireEvent(QUERY_TOOL_EVENTS.TRIGGER_FORMAT_SQL);
+            } else {
+              queryToolCtx.mainContainerRef?.current?.dispatchEvent(new KeyboardEvent('keydown', {
+                which: e.which,
+                keyCode: e.keyCode,
+                altKey: e.altKey,
+                shiftKey: e.shiftKey,
+                ctrlKey: e.ctrlKey,
+                metaKey: e.metaKey,
+              }));
             }
+            e.preventDefault();
+            e.stopPropagation();
             return true;
-          },
-          preventDefault: true,
-          stopPropagation: true,
-        }));
+          }
+          return false;
+        },
+      }];
     },
     [queryToolCtx.preferences]
   );

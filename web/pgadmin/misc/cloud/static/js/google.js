@@ -87,7 +87,7 @@ export function GoogleCredentials(props) {
               })
               .catch((error)=>{
                 clearInterval(interval);
-                reject(error);
+                reject(error instanceof Error ? error : Error(gettext('Something went wrong')));
               });
             countdown = countdown - 1;
           }, 1000);

@@ -124,7 +124,11 @@ export function checkMasterPassword(data, masterpass_callback_queue, cancel_call
 // This functions is used to show the master password dialog.
 export function showMasterPassword(isPWDPresent, errmsg, masterpass_callback_queue, cancel_callback, keyring_name='') {
   const api = getApiInstance();
-  let title =  keyring_name.length > 0 ? gettext('Migrate Saved Passwords') : isPWDPresent ? gettext('Unlock Saved Passwords') : gettext('Set Master Password');
+  let title =  gettext('Set Master Password');
+  if (keyring_name.length > 0)
+    title = gettext('Migrate Saved Passwords');
+  else if (isPWDPresent)
+    title = gettext('Unlock Saved Passwords');
 
   pgAdmin.Browser.notifier.showModal(title, (onClose)=> {
     return (
@@ -206,7 +210,7 @@ export function showChangeServerPassword() {
                 onClose();
               })
               .catch((error)=>{
-                reject(error);
+                reject(error instanceof Error ? error : Error(gettext('Something went wrong')));
               });
           });
         }}
@@ -233,7 +237,7 @@ export function showChangeUserPassword(url) {
                 resolve(res.data);
               })
               .catch((err)=>{
-                reject(err);
+                reject(err instanceof Error ? err : Error(gettext('Something went wrong')));
               });
           });
         }}
@@ -259,7 +263,7 @@ export function showChangeUserPassword(url) {
               onClose();
               pgAdmin.Browser.notifier.success(res.data.info);
             }).catch((err)=>{
-              reject(err);
+              reject(err instanceof Error ? err : Error(gettext('Something went wrong')));
             });
           });
         }}
@@ -332,7 +336,7 @@ export function showChangeOwnership() {
                 resolve(respData.data);
               })
               .catch((err)=>{
-                reject(err);
+                reject(err instanceof Error ? err : Error(gettext('Something went wrong')));
               });
           }
         });

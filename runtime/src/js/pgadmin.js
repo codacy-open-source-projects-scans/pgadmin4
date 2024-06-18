@@ -29,6 +29,10 @@ let pythonPath = misc.getPythonPath();
 let pgadminFile = '../web/pgAdmin4.py';
 let configFile = '../web/config.py';
 
+if (misc.insideFlatpak()) {
+  pgadminFile = '/app/pgAdmin4/web/pgAdmin4.py';
+}
+
 // Override the paths above, if a developer needs to
 if (fs.existsSync('dev_config.json')) {
   try {
@@ -212,7 +216,7 @@ function launchPgAdminWindow() {
     // https://github.com/nwjs/nw.js/issues/7973
     pgadminWindow.on('close', function () {
       // Resize Window
-      resizeHeightBy = pgadminWindow.window.outerHeight - pgadminWindow.window.innerHeight;
+      let resizeHeightBy = pgadminWindow.window.outerHeight - pgadminWindow.window.innerHeight;
       pgadminWindow.resizeBy(0, -resizeHeightBy);
       // Remove 'close' event handler, and then close window
       pgadminWindow.removeAllListeners('close');
@@ -554,7 +558,7 @@ function getSubMenu(menuItem) {
                 if (sub.submenu?.items?.length) {
                   sub.submenu.items.forEach((m) => {
                     if (m.type == 'checkbox') {
-                      m.label == item.label ? m.checked = true : m.checked = false;
+                      m.checked = m.label == item.label;
                     }
                   });
                 }

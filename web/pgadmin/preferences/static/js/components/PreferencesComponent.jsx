@@ -65,6 +65,9 @@ const StyledBox = styled(Box)(({theme}) => ({
         height: '100%',
         paddingTop: '5px',
         overflow: 'auto',
+        '& .PreferencesComponent-preferencesContainerBackground': {
+          backgroundColor: theme.palette.background.default,
+        }
       },
     },
     '& .PreferencesComponent-footer': {
@@ -111,7 +114,7 @@ function RightPanel({ schema, ...props }) {
     try {
       resolve(props.initValues);
     } catch (error) {
-      reject(error);
+      reject(error instanceof Error ? error : Error(gettext('Something went wrong')));
     }
   });
 
@@ -123,6 +126,7 @@ function RightPanel({ schema, ...props }) {
       schema={schema}
       showFooter={false}
       isTabView={false}
+      formClassName='PreferencesComponent-preferencesContainerBackground'
       onDataChange={(isChanged, changedData) => {
         props.onDataChange(changedData);
       }}

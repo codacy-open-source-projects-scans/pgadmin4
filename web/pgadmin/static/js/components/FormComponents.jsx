@@ -43,6 +43,7 @@ import { withColorPicker } from '../helpers/withColorPicker';
 import { useWindowSize } from '../custom_hooks';
 import PgTreeView from '../PgTreeView';
 import Loader from 'sources/components/Loader';
+import { MY_STORAGE } from '../../../misc/file_manager/static/js/components/FileManagerConstants';
 
 
 const Root = styled('div')(({theme}) => ({
@@ -459,8 +460,12 @@ export function InputFileSelect({ controlProps, onChange, disabled, readonly, is
       dialog_title: controlProps.dialogTitle || '',
       btn_primary: controlProps.btnPrimary || '',
     };
-    showFileManager(params, (fileName)=>{
-      onChange?.(decodeURI(fileName));
+    showFileManager(params, (fileName, dir)=>{
+      if (dir && dir != MY_STORAGE){
+        onChange?.(dir + ':' + decodeURI(fileName));
+      }else{
+        onChange?.(decodeURI(fileName));
+      }
       inpRef.current.focus();
     });
   };
@@ -813,7 +818,7 @@ function OptionView({ image, imageUrl, label }) {
   return (
     <Root>
       {image && <span className={'Form-optionIcon ' + image}></span>}
-      {imageUrl && <img style={{height: '20px', marginRight: '4px'}} src={imageUrl} />}
+      {imageUrl && <img style={{height: '20px', marginRight: '4px'}} src={imageUrl} alt="" />}
       <span>{label}</span>
     </Root>
   );
@@ -1063,12 +1068,14 @@ const ColorButton = withColorPicker(PgIconButton);
 export function InputColor({ value, controlProps, disabled, onChange, currObj }) {
   let btnStyles = { backgroundColor: value };
   return (
-    <ColorButton title={gettext('Select the color')} className='Form-colorBtn' style={btnStyles} disabled={disabled}
-      icon={(_.isUndefined(value) || _.isNull(value) || value === '') && <CloseIcon data-label="CloseIcon" />} options={{
-        ...controlProps,
-        disabled: disabled
-      }} onChange={onChange} value={value} currObj={currObj}
-    />
+    <Root>
+      <ColorButton title={gettext('Select the color')} className='Form-colorBtn' style={btnStyles} disabled={disabled}
+        icon={(_.isUndefined(value) || _.isNull(value) || value === '') && <CloseIcon data-label="CloseIcon" />} options={{
+          ...controlProps,
+          disabled: disabled
+        }} onChange={onChange} value={value} currObj={currObj}
+      />
+    </Root>
   );
 }
 InputColor.propTypes = {
@@ -1206,8 +1213,8 @@ export function FormInputSelectThemes({ hasError, label, className, helpMessage,
   const cid = _.uniqueId('c');
   const helpid = `h${cid}`;
   return (
-    <FormInput label={label} error={hasError} className={className} helpMessage={helpMessage} testcid={testcid} labelTooltip={labelTooltip}>
-      <SelectThemes cid={cid} helpid={helpid} onChange={onChange} {...props} />
+    <FormInput label={label} error={hasError} className={className}  testcid={testcid} labelTooltip={labelTooltip}>
+      <SelectThemes cid={cid} helpid={helpid} helpMessage={helpMessage} onChange={onChange} {...props} />
     </FormInput>
   );
 }

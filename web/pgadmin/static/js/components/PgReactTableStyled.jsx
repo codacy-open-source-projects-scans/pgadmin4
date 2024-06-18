@@ -157,7 +157,7 @@ export const PgReactTableCell = forwardRef(({row, cell, children, className}, re
   if (row.original.row_type === 'alert') {
     classNames.push('row-alert');
   }
-  if(row.original.icon && row.original.icon[cell.column.id]) {
+  if(row.original.icon?.[cell.column.id]) {
     classNames.push(row.original.icon[cell.column.id], 'cell-with-icon');
   }
   if(cell.column.columnDef.dataClassName){
@@ -171,7 +171,7 @@ export const PgReactTableCell = forwardRef(({row, cell, children, className}, re
       flex: `var(--col-${cell.column.id.replace(/\W/g, '_')}-size) 0 auto`,
       width: `calc(var(--col-${cell.column.id.replace(/\W/g, '_')}-size)*1px)`,
       ...(cell.column.columnDef.maxSize ? { maxWidth: `${cell.column.columnDef.maxSize}px` } : {})
-    }} role='cell'
+    }}
     className={classNames.join(' ')}
     title={String(cell.getValue() ?? '')}>
       <div className='pgrd-row-cell-content'>{children}</div>
@@ -189,7 +189,7 @@ PgReactTableCell.propTypes = {
 
 export const PgReactTableRow = forwardRef(({ children, className, ...props }, ref)=>{
   return (
-    <div className={['pgrt-row', className].join(' ')} ref={ref} role="row" {...props}>
+    <div className={['pgrt-row', className].join(' ')} ref={ref} {...props}>
       {children}
     </div>
   );
@@ -232,8 +232,8 @@ PgReactTableRowExpandContent.propTypes = {
 export function PgReactTableHeader({table}) {
   return (
     <div className='pgrt-header'>
-      {table.getHeaderGroups().map((headerGroup, idx) => (
-        <div key={idx} className='pgrt-header-row' style={{  }}>
+      {table.getHeaderGroups().map((headerGroup) => (
+        <div key={headerGroup.id} className='pgrt-header-row' style={{  }}>
           {headerGroup.headers.map((header) => (
             <div
               key={header.id}
@@ -304,8 +304,8 @@ export const PgReactTable = forwardRef(({children, table, rootClassName, tableCl
   const columnSizeVars = React.useMemo(() => {
     const headers = table.getFlatHeaders();
     const colSizes = {};
-    for (let i = 0; i < headers.length; i++) {
-      const header = headers[i];
+    for (let value of headers) {
+      const header = value;
       colSizes[`--header-${header.id.replace(/\W/g, '_')}-size`] = header.getSize();
       colSizes[`--col-${header.column.id.replace(/\W/g, '_')}-size`] = header.column.getSize();
     }

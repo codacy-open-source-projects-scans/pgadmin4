@@ -89,7 +89,7 @@ export function MainToolBar({containerRef, onFilterClick, onManageMacros, onAddT
     if(!queryToolCtx.preferences.sqleditor.underline_query_cursor && queryToolCtx.preferences.sqleditor.underlined_query_execute_warning){
       eventBus.fireEvent(QUERY_TOOL_EVENTS.EXECUTE_CURSOR_WARNING);
     } else {
-      eventBus.fireEvent(QUERY_TOOL_EVENTS.TRIGGER_EXECUTION,true);
+      eventBus.fireEvent(QUERY_TOOL_EVENTS.TRIGGER_EXECUTION, null, '', true);
     }
   }, [queryToolCtx.preferences.sqleditor]);
   const executeScript = useCallback(()=>{
@@ -100,7 +100,7 @@ export function MainToolBar({containerRef, onFilterClick, onManageMacros, onAddT
   }, []);
 
   const explain = useCallback((analyze=false)=>{
-    eventBus.fireEvent(QUERY_TOOL_EVENTS.TRIGGER_EXECUTION, false, {
+    eventBus.fireEvent(QUERY_TOOL_EVENTS.TRIGGER_EXECUTION, {
       format: 'json',
       analyze: analyze,
       verbose: Boolean(checkedMenuItems['explain_verbose']),
@@ -282,7 +282,7 @@ export function MainToolBar({containerRef, onFilterClick, onManageMacros, onAddT
     eventBus.fireEvent(QUERY_TOOL_EVENTS.EXECUTION_START, 'ROLLBACK;', null, true);
   };
   const executeMacro = (m)=>{
-    eventBus.fireEvent(QUERY_TOOL_EVENTS.TRIGGER_EXECUTION,false, null, m.sql);
+    eventBus.fireEvent(QUERY_TOOL_EVENTS.TRIGGER_EXECUTION, null, m.sql);
   };
   const onLimitChange=(e)=>{
     setLimit(e.target.value);
@@ -594,7 +594,7 @@ export function MainToolBar({containerRef, onFilterClick, onManageMacros, onAddT
         <PgMenuItem shortcut={queryToolPref.clear_query}
           onClick={clearQuery}>{gettext('Clear Query')}</PgMenuItem>
         <PgMenuDivider />
-        <PgMenuItem shortcut={queryToolPref.format_sql}onClick={formatSQL}>{gettext('Format SQL')}</PgMenuItem>
+        <PgMenuItem shortcut={queryToolPref.format_sql} onClick={formatSQL}>{gettext('Format SQL')}</PgMenuItem>
       </PgMenu>
       <PgMenu
         anchorRef={filterMenuRef}
