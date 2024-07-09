@@ -14,9 +14,13 @@ import PropTypes from 'prop-types';
 import KeyboardArrowUpIcon from '@mui/icons-material/KeyboardArrowUp';
 import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
+import DragIndicatorRoundedIcon from '@mui/icons-material/DragIndicatorRounded';
+import EditRoundedIcon from '@mui/icons-material/EditRounded';
+import DeleteRoundedIcon from '@mui/icons-material/DeleteRounded';
 import { PgIconButton } from './Buttons';
 import CustomPropTypes from '../custom_prop_types';
 import { InputSwitch } from './FormComponents';
+import { Checkbox } from '@mui/material';
 
 
 const StyledDiv = styled('div')(({theme})=>({
@@ -129,6 +133,21 @@ const StyledDiv = styled('div')(({theme})=>({
               whiteSpace: 'nowrap',
               userSelect: 'text',
               width: '100%',
+            },
+
+            '& .reorder-cell': {
+              cursor: 'move',
+              padding: '4px 2px',
+            },
+            '& .pgrt-cell-button': {
+              border: 0,
+              borderRadius: 0,
+              padding: 0,
+              minWidth: 0,
+              backgroundColor: 'inherit',
+              '&.Mui-disabled': {
+                border: 0,
+              },
             }
           }
         },
@@ -139,7 +158,7 @@ const StyledDiv = styled('div')(({theme})=>({
           flexGrow: 1,
         }
       }
-    }
+    },
   }
 }));
 
@@ -242,11 +261,12 @@ export function PgReactTableHeader({table}) {
                 flex: `var(--header-${header?.id.replace(/\W/g, '_')}-size) 0 auto`,
                 width: `calc(var(--header-${header?.id.replace(/\W/g, '_')}-size)*1px)`,
                 ...(header.column.columnDef.maxSize ? { maxWidth: `${header.column.columnDef.maxSize}px` } : {}),
-                cursor: header.column.getCanSort() ? 'pointer' : 'initial',
               }}
-              onClick={header.column.getCanSort() ? header.column.getToggleSortingHandler() : undefined}
             >
-              <div title={flexRender(header.column.columnDef.header, header.getContext())}>
+              <div title={flexRender(header.column.columnDef.header, header.getContext())}
+                style={{cursor: header.column.getCanSort() ? 'pointer' : 'initial'}}
+                onClick={header.column.getCanSort() ? header.column.getToggleSortingHandler() : undefined}
+              >
                 {flexRender(header.column.columnDef.header, header.getContext())}
                 {header.column.getCanSort() && header.column.getIsSorted() &&
                   <span>
@@ -286,7 +306,7 @@ PgReactTableBody.propTypes = {
   children: CustomPropTypes.children,
 };
 
-export const PgReactTable = forwardRef(({children, table, rootClassName, tableClassName, ...props}, ref)=>{
+export const PgReactTable = forwardRef(({children, table, rootClassName, tableClassName, onScrollFunc, ...props}, ref)=>{
   const columns = table.getAllColumns();
 
   useEffect(()=>{
@@ -313,7 +333,7 @@ export const PgReactTable = forwardRef(({children, table, rootClassName, tableCl
   }, [columns, table.getState().columnSizingInfo]);
 
   return (
-    <StyledDiv className={['pgrt', rootClassName].join(' ')} ref={ref} >
+    <StyledDiv className={['pgrt', rootClassName].join(' ')} ref={ref} onScroll={e => onScrollFunc?.(e.target)}>
       <div className={['pgrt-table', tableClassName].join(' ')} style={{ ...columnSizeVars }} {...props}>
         {children}
       </div>
@@ -326,9 +346,10 @@ PgReactTable.propTypes = {
   rootClassName: PropTypes.any,
   tableClassName: PropTypes.any,
   children: CustomPropTypes.children,
+  onScrollFunc: PropTypes.any,
 };
 
-export function getExpandCell({ onClick, ...props }) {
+export function getExpandCell({ onClick, title }) {
   const Cell = ({ row }) => {
     const onClickFinal = (e) => {
       e.preventDefault();
@@ -346,16 +367,14 @@ export function getExpandCell({ onClick, ...props }) {
           )
         }
         noBorder
-        {...props}
         onClick={onClickFinal}
-        aria-label={props.title}
+        aria-label={title}
       />
     );
   };
 
   Cell.displayName = 'ExpandCell';
   Cell.propTypes = {
-    title: PropTypes.string,
     row: PropTypes.any,
   };
 
@@ -370,6 +389,98 @@ export function getSwitchCell() {
   Cell.displayName = 'SwitchCell';
   Cell.propTypes = {
     getValue: PropTypes.func,
+  };
+
+  return Cell;
+}
+
+export function getCheckboxCell({title}) {
+  const Cell = ({ table }) => {
+    return (
+      <div style={{textAlign: 'center', minWidth: 20}}>
+        <Checkbox
+          color="primary"
+          checked={table.getIsAllRowsSelected()}
+          indeterminate={table.getIsSomeRowsSelected()}
+          onChange={table.getToggleAllRowsSelectedHandler()}
+          inputProps={{ 'aria-label': title }}
+        />
+      </div>
+    );
+  };
+
+  Cell.displayName = 'CheckboxCell';
+  Cell.propTypes = {
+    table: PropTypes.object,
+  };
+
+  return Cell;
+}
+
+export function getCheckboxHeaderCell({title}) {
+  const Cell = ({ row }) => {
+    return (
+      <div style={{textAlign: 'center', minWidth: 20}}>
+        <Checkbox
+          color="primary"
+          checked={row.getIsSelected()}
+          indeterminate={row.getIsSomeSelected()}
+          disabled={!row.getCanSelect()}
+          onChange={row.getToggleSelectedHandler()}
+          inputProps={{ 'aria-label': title }}
+        />
+      </div>
+    );
+  };
+
+  Cell.displayName = 'CheckboxHeaderCell';
+  Cell.propTypes = {
+    row: PropTypes.object,
+  };
+
+  return Cell;
+}
+
+export function getReorderCell() {
+  const Cell = () => {
+    return <div className='reorder-cell'>
+      <DragIndicatorRoundedIcon fontSize="small" />
+    </div>;
+  };
+
+  Cell.displayName = 'ReorderCell';
+
+  return Cell;
+}
+
+export function getEditCell({isDisabled, title}) {
+  const Cell = ({ row }) => {
+    return <PgIconButton data-test="expand-row" title={title} icon={<EditRoundedIcon fontSize="small" />} className='pgrt-cell-button'
+      onClick={()=>{
+        row.toggleExpanded();
+      }} disabled={isDisabled?.(row)}
+    />;
+  };
+
+  Cell.displayName = 'EditCell';
+  Cell.propTypes = {
+    row: PropTypes.any,
+  };
+
+  return Cell;
+}
+
+export function getDeleteCell({isDisabled, title, onClick}) {
+  const Cell = ({ row }) => (
+    <PgIconButton data-test="delete-row" title={title} icon={<DeleteRoundedIcon fontSize="small" />}
+      onClick={()=>onClick?.(row)}
+      className='pgrt-cell-button' disabled={isDisabled?.(row)}
+    />
+  );
+
+  Cell.displayName = 'DeleteCell';
+  Cell.propTypes = {
+    row: PropTypes.any,
   };
 
   return Cell;

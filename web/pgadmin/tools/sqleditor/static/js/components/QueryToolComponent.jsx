@@ -19,7 +19,7 @@ import { Messages } from './sections/Messages';
 import getApiInstance, {callFetch, parseApiError} from '../../../../../static/js/api_instance';
 import url_for from 'sources/url_for';
 import { PANELS, QUERY_TOOL_EVENTS, CONNECTION_STATUS, MAX_QUERY_LENGTH } from './QueryToolConstants';
-import { useInterval } from '../../../../../static/js/custom_hooks';
+import { useBeforeUnload, useInterval } from '../../../../../static/js/custom_hooks';
 import { Box } from '@mui/material';
 import { getDatabaseLabel, getTitle, setQueryToolDockerTitle } from '../sqleditor_title';
 import gettext from 'sources/gettext';
@@ -88,11 +88,6 @@ function setPanelTitle(docker, panelId, title, qtState, dirty=false) {
     });
     setQueryToolDockerTitle(docker, panelId, true, title, qtState.current_file);
   }
-}
-
-function onBeforeUnload(e) {
-  e.preventDefault();
-  e.returnValue = 'prevent';
 }
 
 const FIXED_PREF = {
@@ -405,6 +400,17 @@ export default function QueryToolComponent({params, pgWindow, pgAdmin, selectedN
       });
   };
 
+  const {forceClose} = useBeforeUnload({
+    enabled: qtState.preferences.browser.confirm_on_refresh_close,
+    isNewTab: qtState.is_new_tab,
+    beforeClose: ()=>{
+      eventBus.current.fireEvent(QUERY_TOOL_EVENTS.WARN_SAVE_DATA_CLOSE);
+    },
+    closePanel: ()=>{
+      qtPanelDocker.close(qtPanelId, true);
+    }
+  });
+
   useEffect(()=>{
     getSQLScript();
     initializeQueryTool();
@@ -418,12 +424,11 @@ export default function QueryToolComponent({params, pgWindow, pgAdmin, selectedN
     });
 
     eventBus.current.registerListener(QUERY_TOOL_EVENTS.FORCE_CLOSE_PANEL, ()=>{
-      qtPanelDocker.close(qtPanelId, true);
+      forceClose();
     });
 
     qtPanelDocker.eventBus.registerListener(LAYOUT_EVENTS.CLOSING, (id)=>{
       if(qtPanelId == id) {
-        window.removeEventListener('beforeunload', onBeforeUnload);
         eventBus.current.fireEvent(QUERY_TOOL_EVENTS.WARN_SAVE_DATA_CLOSE);
       }
     });
@@ -561,7 +566,7 @@ export default function QueryToolComponent({params, pgWindow, pgAdmin, selectedN
     const events = [
       [QUERY_TOOL_EVENTS.TRIGGER_LOAD_FILE, ()=>{
         let fileParams = {
-          'supported_types': ['*', 'sql'], // file types allowed
+          'supported_types': ['sql', '*'], // file types allowed
           'dialog_type': 'select_file', // open select file dialog
         };
         pgAdmin.Tools.FileManager.show(fileParams, (fileName, storage)=>{
@@ -573,7 +578,7 @@ export default function QueryToolComponent({params, pgWindow, pgAdmin, selectedN
           eventBus.current.fireEvent(QUERY_TOOL_EVENTS.SAVE_FILE, qtState.current_file);
         } else {
           let fileParams = {
-            'supported_types': ['*', 'sql'],
+            'supported_types': ['sql', '*'],
             'dialog_type': 'create_file',
             'dialog_title': 'Save File',
             'btn_primary': 'Save',
@@ -630,19 +635,6 @@ export default function QueryToolComponent({params, pgWindow, pgAdmin, selectedN
     });
   };
 
-  useEffect(()=> {
-    // Add beforeunload event if "Confirm on close or refresh" option is enabled in the preferences.
-    if(qtState.preferences.browser.confirm_on_refresh_close){
-      window.addEventListener('beforeunload', onBeforeUnload);
-    } else {
-      window.removeEventListener('beforeunload', onBeforeUnload);
-    }
-
-    return () => {
-      window.removeEventListener('beforeunload', onBeforeUnload);
-    };
-  }, [qtState.preferences.browser]);
-
   const updateQueryToolConnection = (connectionData, isNew=false)=>{
     let currSelectedConn = _.find(qtState.connection_list, (c)=>c.is_selected);
     let currConnected = qtState.connected;
@@ -698,7 +690,7 @@ export default function QueryToolComponent({params, pgWindow, pgAdmin, selectedN
                 fgcolor: connectionData.fgcolor,
                 bgcolor: connectionData.bgcolor,
               },
-              connected: respData.data.trans_id,
+              connected: Boolean(respData.data.trans_id),
               obtaining_conn: false,
             };
           });

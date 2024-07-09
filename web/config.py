@@ -461,12 +461,14 @@ DEFAULT_BINARY_PATHS = {
     "pg-14": "",
     "pg-15": "",
     "pg-16": "",
+    "pg-17": "",
     "ppas": "",
     "ppas-12": "",
     "ppas-13": "",
     "ppas-14": "",
     "ppas-15": "",
-    "ppas-16": ""
+    "ppas-16": "",
+    "ppas-17": ""
 }
 
 ##########################################################################
@@ -481,12 +483,14 @@ FIXED_BINARY_PATHS = {
     "pg-14": "",
     "pg-15": "",
     "pg-16": "",
+    "pg-17": "",
     "ppas": "",
     "ppas-12": "",
     "ppas-13": "",
     "ppas-14": "",
     "ppas-15": "",
-    "ppas-16": ""
+    "ppas-16": "",
+    "ppas-17": ""
 }
 
 ##########################################################################
@@ -924,6 +928,12 @@ SERVER_HEARTBEAT_TIMEOUT = 30  # In seconds
 # This setting is applicable only for server mode.
 #############################################################################
 ENABLE_SERVER_PASS_EXEC_CMD = False
+
+#############################################################################
+# Number of records to fetch in one batch for server logs.
+##############################################################################
+
+ON_DEMAND_LOG_COUNT = 10000
 
 #############################################################################
 # Patch the default config with custom config and other manipulations

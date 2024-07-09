@@ -15,9 +15,6 @@ import { Box } from '@mui/material';
 import { PgIconButton } from '../components/Buttons';
 import AddIcon from '@mui/icons-material/AddOutlined';
 import { MappedCellControl } from './MappedControl';
-import DragIndicatorRoundedIcon from '@mui/icons-material/DragIndicatorRounded';
-import EditRoundedIcon from '@mui/icons-material/EditRounded';
-import DeleteRoundedIcon from '@mui/icons-material/DeleteRounded';
 
 import {
   useReactTable,
@@ -42,12 +39,19 @@ import { useIsMounted } from '../custom_hooks';
 import { InputText } from '../components/FormComponents';
 import { usePgAdmin } from '../BrowserComponent';
 import { requestAnimationAndFocus } from '../utils';
-import { PgReactTable, PgReactTableBody, PgReactTableCell, PgReactTableHeader, PgReactTableRow, PgReactTableRowContent, PgReactTableRowExpandContent } from '../components/PgReactTableStyled';
+import { PgReactTable, PgReactTableBody, PgReactTableCell, PgReactTableHeader,
+  PgReactTableRow, PgReactTableRowContent, PgReactTableRowExpandContent,
+  getDeleteCell, getEditCell, getReorderCell } from '../components/PgReactTableStyled';
+import { useVirtualizer } from '@tanstack/react-virtual';
 
 const StyledBox = styled(Box)(({theme}) => ({
   '& .DataGridView-grid': {
     ...theme.mixins.panelBorder,
     backgroundColor: theme.palette.background.default,
+    display: 'flex',
+    flexDirection: 'column',
+    minHeight: 0,
+    height: '100%',
     '& .DataGridView-gridHeader': {
       display: 'flex',
       ...theme.mixins.panelBorder.bottom,
@@ -69,7 +73,6 @@ const StyledBox = styled(Box)(({theme}) => ({
       '&.pgrt-table': {
         '& .pgrt-body':{
           '& .pgrt-row': {
-            position: 'unset',
             backgroundColor: theme.otherVars.emptySpaceBg,
             '& .pgrt-row-content':{
               '& .pgrd-row-cell': {
@@ -77,16 +80,6 @@ const StyledBox = styled(Box)(({theme}) => ({
                 padding: theme.spacing(0.5),
                 '&.btn-cell, &.expanded-icon-cell': {
                   padding: '2px 0px'
-                },
-                '& .DataGridView-gridRowButton': {
-                  border: 0,
-                  borderRadius: 0,
-                  padding: 0,
-                  minWidth: 0,
-                  backgroundColor: 'inherit',
-                  '&.Mui-disabled': {
-                    border: 0,
-                  },
                 },
               }
             },
@@ -103,10 +96,6 @@ const StyledBox = styled(Box)(({theme}) => ({
       inset: 0,
       opacity: 0.75,
     }
-  },
-  '& .DataGridView-btnReorder': {
-    cursor: 'move',
-    padding: '4px 2px',
   },
   '& .DataGridView-resizer': {
     display: 'inline-block',
@@ -139,7 +128,7 @@ function DataTableRow({index, row, totalRows, isResizing, isHovered, schema, sch
    * If table data changes, then react-table re-renders the complete tables
    * We can avoid re-render by if row data is not changed
    */
-  let depsMap = _.values(row.original, Object.keys(row.original).filter((k)=>!k.startsWith('btn')));
+  let depsMap = [JSON.stringify(row.original)];
   const externalDeps = useMemo(()=>{
     let retVal = [];
     /* Calculate the fields which depends on the current field
@@ -173,9 +162,6 @@ function DataTableRow({index, row, totalRows, isResizing, isHovered, schema, sch
         }
       });
     });
-
-    // Try autofocus on newly added row.
-    requestAnimationAndFocus(rowRef.current?.querySelector('input'));
 
     return ()=>{
       /* Cleanup the listeners when unmounting */
@@ -241,12 +227,12 @@ function DataTableRow({index, row, totalRows, isResizing, isHovered, schema, sch
   drop(rowRef);
 
   return useMemo(()=>
-    <PgReactTableRowContent ref={rowRef} row={row} data-handler-id={handlerId} className={isHovered ? 'DataGridView-tableRowHovered' : null} data-test='data-table-row' style={{position: 'initial'}}>
+    <PgReactTableRowContent ref={rowRef} data-handler-id={handlerId} className={isHovered ? 'DataGridView-tableRowHovered' : null} data-test='data-table-row' style={{position: 'initial'}}>
       {row.getVisibleCells().map((cell) => {
         let {modeSupported} = cell.column.field ? getFieldMetaData(cell.column.field, schemaRef.current, {}, viewHelperProps) : {modeSupported: true};
 
         const content = flexRender(cell.column.columnDef.cell, {
-          key: cell.column.columnDef.cell.type,
+          key: cell.column.columnDef.cell?.type ?? cell.column.columnDef.id,
           ...cell.getContext(),
           reRenderRow: ()=>{setKey((currKey)=>!currKey);}
         });
@@ -297,6 +283,58 @@ DataGridHeader.propTypes = {
   onSearchTextChange: PropTypes.func,
 };
 
+function getMappedCell({
+  field,
+  schemaRef,
+  viewHelperProps,
+  accessPath,
+  dataDispatch
+}) {
+  const Cell = ({row, ...other}) => {
+    const value = other.getValue();
+    /* Make sure to take the latest field info from schema */
+    field = _.find(schemaRef.current.fields, (f)=>f.id==field.id) || field;
+
+    let {editable, disabled, modeSupported} = getFieldMetaData(field, schemaRef.current, row.original || {}, viewHelperProps);
+
+    if(_.isUndefined(field.cell)) {
+      console.error('cell is required ', field);
+    }
+
+    return modeSupported && <MappedCellControl rowIndex={row.index} value={value}
+      row={row} {...field}
+      readonly={!editable}
+      disabled={disabled}
+      visible={true}
+      onCellChange={(changeValue)=>{
+        if(field.radioType) {
+          dataDispatch({
+            type: SCHEMA_STATE_ACTIONS.BULK_UPDATE,
+            path: accessPath,
+            value: changeValue,
+            id: field.id
+          });
+        }
+        dataDispatch({
+          type: SCHEMA_STATE_ACTIONS.SET_VALUE,
+          path: accessPath.concat([row.index, field.id]),
+          value: changeValue,
+        });
+      }}
+      reRenderRow={other.reRenderRow}
+    />;
+  };
+
+  Cell.displayName = 'Cell';
+  Cell.propTypes = {
+    row: PropTypes.object.isRequired,
+    value: PropTypes.any,
+    onCellChange: PropTypes.func,
+  };
+
+  return Cell;
+}
+
 export default function DataGridView({
   value, viewHelperProps, schema, accessPath, dataDispatch, containerClassName,
   fixedRows, ...props}) {
@@ -324,13 +362,8 @@ export default function DataGridView({
           size: 36,
           maxSize: 26,
           minSize: 26,
-          cell: ()=>{
-            return <div className='DataGridView-btnReorder'>
-              <DragIndicatorRoundedIcon fontSize="small" />
-            </div>;
-          }
+          cell: getReorderCell(),
         };
-        colInfo.cell.displayName = 'Cell';
         cols.push(colInfo);
       }
       if(props.canEdit) {
@@ -344,21 +377,16 @@ export default function DataGridView({
           size: 26,
           maxSize: 26,
           minSize: 26,
-          cell: ({row})=>{
-            let canEditRow = true;
-            if(props.canEditRow) {
-              canEditRow = evalFunc(schemaRef.current, props.canEditRow, row || {});
-            }
-            return <PgIconButton data-test="expand-row" title={gettext('Edit row')} icon={<EditRoundedIcon fontSize="small" />} className='DataGridView-gridRowButton'
-              onClick={()=>{
-                row.toggleExpanded();
-              }} disabled={!canEditRow}
-            />;
-          }
-        };
-        colInfo.cell.displayName = 'Cell';
-        colInfo.cell.propTypes = {
-          row: PropTypes.object.isRequired,
+          cell: getEditCell({
+            isDisabled: (row)=>{
+              let canEditRow = true;
+              if(props.canEditRow) {
+                canEditRow = evalFunc(schemaRef.current, props.canEditRow, row.original || {});
+              }
+              return !canEditRow;
+            },
+            title: gettext('Edit row'),
+          })
         };
         cols.push(colInfo);
       }
@@ -373,43 +401,39 @@ export default function DataGridView({
           size: 26,
           maxSize: 26,
           minSize: 26,
-          cell: ({row}) => {
-            let canDeleteRow = true;
-            if(props.canDeleteRow) {
-              canDeleteRow = evalFunc(schemaRef.current, props.canDeleteRow, row || {});
-            }
+          cell: getDeleteCell({
+            title: gettext('Delete row'),
+            isDisabled: (row)=>{
+              let canDeleteRow = true;
+              if(props.canDeleteRow) {
+                canDeleteRow = evalFunc(schemaRef.current, props.canDeleteRow, row.original || {});
+              }
+              return !canDeleteRow;
+            },
+            onClick: (row)=>{
+              const deleteRow = ()=> {
+                dataDispatch({
+                  type: SCHEMA_STATE_ACTIONS.DELETE_ROW,
+                  path: accessPath,
+                  value: row.index,
+                });
+                return true;
+              };
 
-            return (
-              <PgIconButton data-test="delete-row" title={gettext('Delete row')} icon={<DeleteRoundedIcon fontSize="small" />}
-                onClick={()=>{
-                  const deleteRow = ()=> {
-                    dataDispatch({
-                      type: SCHEMA_STATE_ACTIONS.DELETE_ROW,
-                      path: accessPath,
-                      value: row.index,
-                    });
+              if (props.onDelete){
+                props.onDelete(row.original || {}, deleteRow);
+              } else {
+                pgAdmin.Browser.notifier.confirm(
+                  props.customDeleteTitle || gettext('Delete Row'),
+                  props.customDeleteMsg || gettext('Are you sure you wish to delete this row?'),
+                  deleteRow,
+                  function() {
                     return true;
-                  };
-
-                  if (props.onDelete){
-                    props.onDelete(row || {}, deleteRow);
-                  } else {
-                    pgAdmin.Browser.notifier.confirm(
-                      props.customDeleteTitle || gettext('Delete Row'),
-                      props.customDeleteMsg || gettext('Are you sure you wish to delete this row?'),
-                      deleteRow,
-                      function() {
-                        return true;
-                      }
-                    );
                   }
-                }} className='DataGridView-gridRowButton' disabled={!canDeleteRow} />
-            );
-          }
-        };
-        colInfo.cell.displayName = 'Cell';
-        colInfo.cell.propTypes = {
-          row: PropTypes.object.isRequired,
+                );
+              }
+            }
+          }),
         };
         cols.push(colInfo);
       }
@@ -446,75 +470,21 @@ export default function DataGridView({
             enableResizing: true,
             enableSorting: false,
             ...widthParms,
-            cell: ({row, ...other}) => {
-              const value = other.getValue();
-              /* Make sure to take the latest field info from schema */
-              field = _.find(schemaRef.current.fields, (f)=>f.id==field.id) || field;
-
-              let {editable, disabled, modeSupported} = getFieldMetaData(field, schemaRef.current, row.original || {}, viewHelperProps);
-
-              if(_.isUndefined(field.cell)) {
-                console.error('cell is required ', field);
-              }
-
-              return modeSupported && <MappedCellControl rowIndex={row.index} value={value}
-                row={row} {...field}
-                readonly={!editable}
-                disabled={disabled}
-                visible={true}
-                onCellChange={(changeValue)=>{
-                  if(field.radioType) {
-                    dataDispatch({
-                      type: SCHEMA_STATE_ACTIONS.BULK_UPDATE,
-                      path: accessPath,
-                      value: changeValue,
-                      id: field.id
-                    });
-                  }
-                  dataDispatch({
-                    type: SCHEMA_STATE_ACTIONS.SET_VALUE,
-                    path: accessPath.concat([row.index, field.id]),
-                    value: changeValue,
-                  });
-                }}
-                reRenderRow={other.reRenderRow}
-              />;
-            },
+            cell: getMappedCell({
+              field: field,
+              schemaRef: schemaRef,
+              viewHelperProps: viewHelperProps,
+              accessPath: accessPath,
+              dataDispatch: dataDispatch,
+            }),
           };
-          colInfo.cell.displayName = 'Cell';
-          colInfo.cell.propTypes = {
-            row: PropTypes.object.isRequired,
-            value: PropTypes.any,
-            onCellChange: PropTypes.func,
-          };
+
           return colInfo;
         })
       );
       return cols;
     },[props.canEdit, props.canDelete, props.canReorder]
   );
-
-  const onAddClick = useCallback(()=>{
-    if(!props.canAddRow) {
-      return;
-    }
-    let newRow = schemaRef.current.getNewData();
-
-    const current_macros = schemaRef.current?._top?._sessData?.macro || null;
-    if (current_macros){
-      newRow = schemaRef.current.getNewData(current_macros);
-    }
-
-    if(props.expandEditOnAdd && props.canEdit) {
-      newRowIndex.current = rows.length;
-    }
-    dataDispatch({
-      type: SCHEMA_STATE_ACTIONS.ADD_ROW,
-      path: accessPath,
-      value: newRow,
-      addOnTop: props.addOnTop
-    });
-  }, [props.canAddRow, rows?.length]);
 
   const columnVisibility = useMemo(()=>{
     const ret = {};
@@ -544,6 +514,27 @@ export default function DataGridView({
 
   const rows = table.getRowModel().rows;
 
+  const onAddClick = useCallback(()=>{
+    if(!props.canAddRow) {
+      return;
+    }
+    let newRow = schemaRef.current.getNewData();
+
+    const current_macros = schemaRef.current?._top?._sessData?.macro || null;
+    if (current_macros){
+      newRow = schemaRef.current.getNewData(current_macros);
+    }
+
+    newRowIndex.current = props.addOnTop ? 0 : rows.length;
+
+    dataDispatch({
+      type: SCHEMA_STATE_ACTIONS.ADD_ROW,
+      path: accessPath,
+      value: newRow,
+      addOnTop: props.addOnTop
+    });
+  }, [props.canAddRow, rows?.length]);
+
   useEffect(()=>{
     let rowsPromise = fixedRows;
 
@@ -564,8 +555,17 @@ export default function DataGridView({
 
   useEffect(()=>{
     if(newRowIndex.current >= 0) {
-      rows[newRowIndex.current]?.toggleExpanded(true);
-      newRowIndex.current = null;
+      virtualizer.scrollToIndex(newRowIndex.current);
+
+      // Try autofocus on newly added row.
+      setTimeout(()=>{
+        const rowInput = tableRef.current?.querySelector(`.pgrt-row[data-index="${newRowIndex.current}"] input`);
+        if(!rowInput) return;
+
+        requestAnimationAndFocus(tableRef.current.querySelector(`.pgrt-row[data-index="${newRowIndex.current}"] input`));
+        props.expandEditOnAdd && props.canEdit && rows[newRowIndex.current]?.toggleExpanded(true);
+        newRowIndex.current = undefined;
+      }, 50);
     }
   }, [rows?.length]);
 
@@ -581,6 +581,18 @@ export default function DataGridView({
   };
 
   const isResizing = _.flatMap(table.getHeaderGroups(), headerGroup => headerGroup.headers.map(header=>header.column.getIsResizing())).includes(true);
+
+  const virtualizer = useVirtualizer({
+    count: rows.length,
+    getScrollElement: () => tableRef.current,
+    estimateSize: () => 42,
+    measureElement:
+      typeof window !== 'undefined' &&
+        navigator.userAgent.indexOf('Firefox') === -1
+        ? element => element?.getBoundingClientRect().height
+        : undefined,
+    overscan: viewHelperProps.virtualiseOverscan ?? 10,
+  });
 
   if(!props.visible) {
     return <></>;
@@ -598,12 +610,19 @@ export default function DataGridView({
         <DndProvider backend={HTML5Backend}>
           <PgReactTable ref={tableRef} table={table} data-test="data-grid-view" tableClassName='DataGridView-table'>
             <PgReactTableHeader table={table} />
-            <PgReactTableBody>
-              {rows.map((row, i) => {
-                return <PgReactTableRow key={row.index}>
-                  <DataTableRow index={i} row={row} totalRows={rows.length} isResizing={isResizing}
+            <PgReactTableBody style={{ height: virtualizer.getTotalSize() + 'px'}}>
+              {virtualizer.getVirtualItems().map((virtualRow) => {
+                const row = rows[virtualRow.index];
+
+                return <PgReactTableRow key={row.id} data-index={virtualRow.index}
+                  ref={node => virtualizer.measureElement(node)}
+                  style={{
+                    transform: `translateY(${virtualRow.start}px)`, // this should always be a `style` as it changes on scroll
+                  }}>
+                  <DataTableRow index={virtualRow.index} row={row} totalRows={rows.length} isResizing={isResizing}
                     schema={schemaRef.current} schemaRef={schemaRef} accessPath={accessPath.concat([row.index])}
-                    moveRow={moveRow} isHovered={i == hoverIndex} setHoverIndex={setHoverIndex} viewHelperProps={viewHelperProps}
+                    moveRow={moveRow} isHovered={virtualRow.index == hoverIndex} setHoverIndex={setHoverIndex} viewHelperProps={viewHelperProps}
+                    measureElement={virtualizer.measureElement}
                   />
                   {props.canEdit &&
                     <PgReactTableRowExpandContent row={row}>

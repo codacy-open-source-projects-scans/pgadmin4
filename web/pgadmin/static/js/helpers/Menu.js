@@ -24,6 +24,16 @@ export default class Menu {
     return menuObj;
   }
 
+  serialize() {
+    return {
+      id: this.id,
+      label: this.label,
+      name: this.name,
+      index: this.index,
+      addSepratior: this.addSepratior,
+    };
+  }
+
   addMenuItem(menuItem, index=null) {
     if (menuItem instanceof MenuItem) {
       menuItem.parentMenu = this;
@@ -106,7 +116,7 @@ export default class Menu {
 
 
 export class MenuItem {
-  constructor(options, onDisableChange, onChangeChecked) {
+  constructor(options, onDisableChange) {
     let menu_opts = [
       'name', 'label', 'priority', 'module', 'callback', 'data', 'enable',
       'category', 'target', 'url', 'node',
@@ -116,7 +126,6 @@ export class MenuItem {
       url: '#',
       target: '_self',
       enable: true,
-      type: 'normal'
     };
     _.extend(this, defaults, _.pick(options, menu_opts));
     if (!this.callback) {
@@ -127,7 +136,6 @@ export class MenuItem {
       };
     }
     this.onDisableChange = onDisableChange;
-    this.changeChecked = onChangeChecked;
     this._isDisabled = true;
     this.checkAndSetDisabled();
   }
@@ -136,9 +144,19 @@ export class MenuItem {
     return MenuItem(options);
   }
 
+  serialize() {
+    return {
+      name: this.name,
+      label: this.label,
+      enabled: !this.isDisabled,
+      priority: this.priority,
+      type: [true, false].includes(this.checked) ? 'checkbox' : this.type,
+      checked: this.checked,
+    };
+  }
+
   change_checked(isChecked) {
     this.checked = isChecked;
-    this.changeChecked?.(this);
   }
 
   getMenuItems() {

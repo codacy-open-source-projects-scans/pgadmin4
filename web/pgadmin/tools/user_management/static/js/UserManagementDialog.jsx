@@ -167,7 +167,7 @@ class UserManagementCollection extends BaseUISchema {
 
     if (state.auth_source != AUTH_METHODS['INTERNAL']) {
       if (obj.isNew(state) && obj.top?._sessData?.userManagement) {
-        for (let user in obj.top._sessData.userManagement) {
+        for (let user of obj.top._sessData.userManagement) {
           if (user?.id &&
             user.username.toLowerCase() == state.username.toLowerCase() &&
             user.auth_source == state.auth_source) {
@@ -194,7 +194,7 @@ class UserManagementCollection extends BaseUISchema {
       }
 
       if (obj.isNew(state) && obj.top?._sessData?.userManagement) {
-        for (let user in obj.top._sessData.userManagement) {
+        for (let user of obj.top._sessData.userManagement) {
           if (user?.id &&
             user.email?.toLowerCase() == state.email?.toLowerCase()) {
             msg = gettext('Email address \'%s\' already exists', state.email);
@@ -261,7 +261,7 @@ class UserManagementSchema extends BaseUISchema {
     return [
       {
         id: 'userManagement', label: '', type: 'collection', schema: obj.userManagementCollObj,
-        canAdd: true, canDelete: true, isFullTab: true, group: 'temp_user',
+        canAdd: true, canDelete: true, isFullTab: true,
         addOnTop: true,
         canDeleteRow: (row)=>{
           return row['id'] != current_user['id'];
@@ -317,7 +317,7 @@ function UserManagementDialog({onClose}) {
   const [roles, setRoles] = React.useState([]);
   const api = getApiInstance();
 
-  React.useEffect(async ()=>{
+  const fetchData = async ()=>{
     try {
       api.get(url_for('user_management.auth_sources'))
         .then(res=>{
@@ -337,6 +337,10 @@ function UserManagementDialog({onClose}) {
     } catch (error) {
       pgAdmin.Browser.notifier.error(parseApiError(error));
     }
+  };
+
+  React.useEffect(()=>{
+    fetchData();
   }, []);
 
   const onSaveClick = (_isNew, changeData)=>{

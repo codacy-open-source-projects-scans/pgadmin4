@@ -65,13 +65,7 @@ from pgadmin.authenticate import AuthSourceManager
 from pgadmin.utils.exception import CryptKeyMissing
 
 from pgadmin.user_login_check import pga_login_required
-
-try:
-    from flask_security.views import default_render_json
-except ImportError as e:
-    # Support Flask-Security-Too == 3.2
-    if sys.version_info < (3, 8):
-        from flask_security.views import _render_json as default_render_json
+from flask_security.views import default_render_json
 
 MODULE_NAME = 'browser'
 BROWSER_STATIC = 'browser.static'
@@ -481,10 +475,6 @@ def utils():
     pg_help_path_pref = prefs.preference('pg_help_path')
     pg_help_path = pg_help_path_pref.get()
 
-    # Added to have theme value available at app start page loading
-    prefs = Preferences.module('misc')
-    theme = prefs.preference('theme').get()
-
     # Get sqleditor options
     prefs = Preferences.module('sqleditor')
 
@@ -546,7 +536,6 @@ def utils():
         render_template(
             'browser/js/utils.js',
             layout=layout,
-            theme=theme,
             jssnippets=snippets,
             pg_help_path=pg_help_path,
             editor_tab_size=editor_tab_size,
@@ -1108,8 +1097,7 @@ if hasattr(config, 'SECURITY_RECOVERABLE') and config.SECURITY_RECOVERABLE:
         form_class = _security.forms.get('reset_password_form').cls
         form = form_class(request.form) if request.form else form_class()
 
-        if sys.version_info >= (3, 8):
-            form.user = user
+        form.user = user
 
         if form.validate_on_submit():
             try:
