@@ -70,10 +70,8 @@ class MiscModule(PgAdminModule):
                 .replace('-', ' ')
                 .title(),
                 'value': theme,
-                'preview_src': url_for(
-                    'static', filename='js/generated/img/' +
-                                       theme_data['preview_img']
-                ) if 'preview_img' in theme_data else None
+                'preview_src': 'js/generated/img/' + theme_data['preview_img']
+                if 'preview_img' in theme_data else None
             })
 
         self.preference.register(
@@ -228,7 +226,6 @@ def validate_binary_path():
     running the utilities with their versions.
     """
     data = None
-    return precondition_required(gettext('Invalid binary path.'))
     if hasattr(request.data, 'decode'):
         data = request.data.decode('utf-8')
 

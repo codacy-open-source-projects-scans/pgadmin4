@@ -68,6 +68,27 @@ fakeroot dpkg-deb --build "${SERVERROOT}" "${DISTROOT}/${APP_NAME}-server_${APP_
 echo "Creating the desktop package..."
 mkdir "${DESKTOPROOT}/DEBIAN"
 
+# Ubuntu 24 requires apparmor profile to work.
+OS_ID=$(grep "^ID=" /etc/os-release | awk -F "=" '{ print $2 }')
+OS_VERSION=$(grep "^VERSION_ID=" /etc/os-release | awk -F "=" '{ print $2 }' | sed 's/"//g' | awk -F "." '{ print $1 }')
+
+if [ "${OS_ID}" == 'ubuntu' ] && [ "${OS_VERSION}" -ge "24" ]; then
+  cat << EOF > "${DESKTOPROOT}/DEBIAN/conffiles"
+/etc/apparmor.d/pgadmin4
+EOF
+
+  mkdir -p "${DESKTOPROOT}/etc/apparmor.d"
+  cp "${SOURCEDIR}/pkg/debian/pgadmin4-aa-profile" "${DESKTOPROOT}/etc/apparmor.d/pgadmin4"
+
+  cat << EOF > "${DESKTOPROOT}/DEBIAN/postinst"
+#!/bin/sh
+
+echo "Load apparmor pgAdmin profile..."
+apparmor_parser -r /etc/apparmor.d/pgadmin4
+EOF
+  chmod 755 "${DESKTOPROOT}/DEBIAN/postinst"
+fi
+
 cat << EOF > "${DESKTOPROOT}/DEBIAN/control"
 Package: ${APP_NAME}-desktop
 Version: ${APP_LONG_VERSION}

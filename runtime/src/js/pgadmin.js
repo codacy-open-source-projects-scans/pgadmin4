@@ -15,6 +15,7 @@ import * as misc from './misc.js';
 import { spawn } from 'child_process';
 import { fileURLToPath } from 'url';
 import { setupMenu } from './menu.js';
+import contextMenu from 'electron-context-menu';
 
 const configStore = new Store({
   defaults: {
@@ -38,8 +39,21 @@ let docsURLSubStrings = ['www.enterprisedb.com', 'www.postgresql.org', 'www.pgad
 process.env['ELECTRON_ENABLE_SECURITY_WARNINGS'] = false;
 
 // Paths to the rest of the app
-
 let [pythonPath, pgadminFile] = misc.getAppPaths(__dirname);
+
+// Do not allow a second instance of pgAdmin to run.
+const gotTheLock = app.requestSingleInstanceLock();
+if (!gotTheLock) {
+  app.quit();
+} else {
+  app.on('second-instance', () => {
+    // Someone tried to run a second instance, we should focus our window.
+    if (pgAdminMainScreen) {
+      if (pgAdminMainScreen.isMinimized()) pgAdminMainScreen.restore();
+      pgAdminMainScreen.focus();
+    }
+  });
+}
 
 // Override the paths above, if a developer needs to
 if (fs.existsSync('dev_config.json')) {
@@ -51,6 +65,13 @@ if (fs.existsSync('dev_config.json')) {
     console.error('Failed to load dev_config', error);
   }
 }
+
+contextMenu({
+  showInspectElement: false,
+  showSearchWithGoogle: false,
+  showLookUpSelection: false,
+  showSelectAll: true,
+});
 
 Menu.setApplicationMenu(null);
 
@@ -328,7 +349,7 @@ ipcMain.handle('setStoreData', (_e, newValues) => {
 });
 ipcMain.handle('getServerLogFile', () => misc.getServerLogFile());
 ipcMain.handle('readServerLog', () => misc.readServerLog());
-ipcMain.handle('restartApp', ()=>{
+ipcMain.on('restartApp', ()=>{
   app.relaunch();
   app.exit(0);
 });

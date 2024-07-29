@@ -66,6 +66,16 @@ const Root = styled('div')(({theme}) => ({
       width: '100%',
       minHeight: '400px',
       padding: '4px',
+      '& .serverLog .TabPanel-content': {
+        height: '94%',
+      },
+      '& .systemStorage .TabPanel-content': {
+        overflowY: 'auto',
+        overflowX: 'hidden',
+      },
+      '& .Dashboard-cardHeader': {
+        padding: '8px',
+      },
       '& .Dashboard-mainTabs': {
         ...theme.mixins.panelBorder.all,
         height: '100%',
@@ -75,23 +85,20 @@ const Root = styled('div')(({theme}) => ({
           color: theme.palette.error.main
         },
         '& .Dashboard-download': {
-          alignSelf: 'end',
           '& .Dashboard-downloadButton': {
-            width: '35px',
-            height:'30px'
+            width: '40px',
+            height:'30px !important',
           },
         },
-        '& .Dashboard-textArea': {
-          height: '88%',
-        }
+        '& .RefreshButtons': {
+          display: 'flex',
+        },
       },
     },
   },
   '& .Dashboard-emptyPanel': {
     width: '100%',
-    height: '100%',
     background: theme.otherVars.emptySpaceBg,
-    overflow: 'auto',
     padding: '8px',
     display: 'flex',
   },
@@ -234,7 +241,7 @@ function getCancelCell(pgAdmin, sid, did, canTakeAction, onSuccess) {
 
 function CustomRefresh({refresh, setRefresh}) {
   return (
-    <RefreshButton onClick={(e) => {
+    <RefreshButton noBorder={false} onClick={(e) => {
       e.preventDefault();
       setRefresh(!refresh);
     }}/>
@@ -245,25 +252,20 @@ CustomRefresh.propTypes = {
   setRefresh: PropTypes.func,
 };
 
-function ActiveOnlyHeader({activeOnly, setActiveOnly, refresh, setRefresh}) {
-  return (<Fragment>
-    <RefreshButton onClick={(e) => {
-      e.preventDefault();
-      setRefresh(!refresh);
-    }}/>
+function ActiveOnlyHeader({activeOnly, setActiveOnly}) {
+  return (
     <InputCheckbox
       label={gettext('Active sessions only')}
       labelPlacement="end"
       className='Dashboard-searchInput'
       onChange={(e) => {
-        e.preventDefault();
         setActiveOnly(e.target.checked);
       }}
       value={activeOnly}
       controlProps={{
         label: gettext('Active sessions only'),
       }}
-    /></Fragment>
+    />
   );
 }
 ActiveOnlyHeader.propTypes = {
@@ -768,7 +770,6 @@ function Dashboard({
       enableFilters: true,
       minSize: 50,
       size: 80,
-      cell: ({ value }) => String(value)
     },
   ];
 
@@ -840,7 +841,6 @@ function Dashboard({
 
   useEffect(() => {
 
-    if (mainTabVal == 0) return;
     // disable replication tab
     if(!treeNodeInfo?.server?.replication_type && mainTabVal == 5) {
       setMainTabVal(0);
@@ -879,14 +879,14 @@ function Dashboard({
       if (node) {
         setSsMsg(gettext('Loading logs...'));
         setDashData([]);
-        if (mainTabVal != 4 && mainTabVal != 5) {
+        if (mainTabVal == 1 || mainTabVal == 2 || mainTabVal == 3) {
           api({
             url: url,
             type: 'GET',
           })
             .then((res) => {
               if (res.data && res.data['logs_disabled']) {
-                setSsMsg(gettext('Please enable the logging to view the server logs.'));
+                setSsMsg(gettext('Please enable the logging to view the server logs or check the log file is in place or not.'));
               } else {
                 setDashData(parseData(res.data));
               }
@@ -933,7 +933,7 @@ function Dashboard({
   }, [nodeData, treeNodeInfo, prefStore, refresh, mainTabVal, logCol, logFormat]);
 
   const filteredDashData = useMemo(()=>{
-    if (mainTabVal == 1 && activeOnly) {
+    if (mainTabVal == 1 && activeOnly && dashData.length > 0) {
       // we want to show 'idle in transaction', 'active', 'active in transaction', and future non-blank, non-"idle" status values
       return dashData[0]['activity'].filter((r)=>(r.state && r.state != '' && r.state != 'idle'));
     }
@@ -966,7 +966,7 @@ function Dashboard({
       label: gettext('Table based logs'),
     };
   const CustomLogHeader = () => {
-    return ( <Box className='Dashboard-cardHeader' display="flex" flexDirection="column">
+    return ( <Box className='Dashboard-cardHeader' display="flex" flexDirection="row">
       <FormInputToggle
         label={gettext('Log Format')}
         className='Dashboard-searchInput'
@@ -977,10 +977,10 @@ function Dashboard({
         options={logConfigFormat}
         controlProps={CustomLogHeaderLabel}
         labelGridBasis={3}
-        controlGridBasis={6}
+        controlGridBasis={3}
       ></FormInputToggle>
       <FormInputSwitch
-        label={gettext('Logs in tabular format ?')}
+        label={gettext('Tabular format?')}
         labelPlacement="end"
         className='Dashboard-searchInput'
         value={logCol}
@@ -990,7 +990,7 @@ function Dashboard({
         }}
         controlProps={CustomLogHeaderLabel}
         labelGridBasis={3}
-        controlGridBasis={6}
+        controlGridBasis={3}
       ></FormInputSwitch>
       <div className='Dashboard-download'><PgIconButton
         size="xs"
@@ -1081,6 +1081,7 @@ function Dashboard({
               <TabPanel value={mainTabVal} index={1} classNameRoot='Dashboard-tabPanel'>
                 {!_.isUndefined(preferences) && preferences.show_activity && (
                   <Fragment>
+                    <CustomRefresh refresh={refresh} setRefresh={setRefresh}/>
                     <SectionContainer title={gettext('Sessions')} style={{height: 'auto', minHeight: '200px', paddingBottom: '20px'}}
                     >
                       <PgTable
@@ -1094,7 +1095,6 @@ function Dashboard({
                     </SectionContainer>
                     <SectionContainer title={gettext('Locks')} style={{height: 'auto', minHeight: '200px', paddingBottom: '20px'}}>
                       <PgTable
-                        customHeader={<CustomRefresh refresh={refresh} setRefresh={setRefresh}/>}
                         caveTable={false}
                         tableNoBorder={false}
                         columns={databaseLocksColumns}
@@ -1103,7 +1103,6 @@ function Dashboard({
                     </SectionContainer>
                     <SectionContainer title={gettext('Prepared Transactions')} style={{height: 'auto', minHeight: '200px', paddingBottom: '20px'}}>
                       <PgTable
-                        customHeader={<CustomRefresh refresh={refresh} setRefresh={setRefresh}/>}
                         caveTable={false}
                         tableNoBorder={false}
                         columns={databasePreparedColumns}
@@ -1123,7 +1122,7 @@ function Dashboard({
                 ></PgTable>
               </TabPanel>
               {/* Server Logs */}
-              <TabPanel value={mainTabVal} index={3} classNameRoot='Dashboard-tabPanel'>
+              <TabPanel value={mainTabVal} index={3} classNameRoot='Dashboard-tabPanel serverLog'>
                 {dashData &&  dashData.length != 0 &&
                   <CustomLogHeader/>}
                 {dashData.length == 0 && <div className='Dashboard-emptyPanel'>
@@ -1152,7 +1151,7 @@ function Dashboard({
                 ></PgTable>}
               </TabPanel>
               {/* System Statistics */}
-              <TabPanel value={mainTabVal} index={4} classNameRoot='Dashboard-tabPanel'>
+              <TabPanel value={mainTabVal} index={4} classNameRoot='Dashboard-tabPanel systemStorage'>
                 <Box height="100%" display="flex" flexDirection="column">
                   {ssMsg === 'installed' && did === ldid ?
                     <ErrorBoundary>

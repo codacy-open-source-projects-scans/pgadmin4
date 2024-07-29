@@ -988,8 +988,8 @@ def poll(trans_id):
             query_len_data = {
                 'transaction_status': transaction_status,
                 'explain_query_length':
-                    get_explain_query_length(
-                        conn._Connection__async_cursor._query)
+                get_explain_query_length(conn._Connection__async_cursor._query)
+                if conn._Connection__async_cursor else 0
             }
             return internal_server_error(result, query_len_data)
         elif status == ASYNC_OK:
@@ -2110,7 +2110,7 @@ def start_query_download_tool(trans_id):
                 )
         if not sql:
             sql = trans_obj.get_sql(sync_conn)
-        if query_commited:
+        if sql and query_commited:
             # Re-execute the query to ensure the latest data is included
             sync_conn.execute_async(sql)
         # This returns generator of records.

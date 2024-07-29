@@ -36,6 +36,7 @@ import usePreferences from '../../../../../../preferences/static/js/store';
 import pgAdmin from 'sources/pgadmin';
 import { styled } from '@mui/material/styles';
 import BeforeUnload from './BeforeUnload';
+import { isMac } from '../../../../../../static/js/keyboard_shortcuts';
 
 /* Custom react-diagram action for keyboard events */
 export class KeyboardShortcutAction extends Action {
@@ -52,7 +53,7 @@ export class KeyboardShortcutAction extends Action {
     for(let shortcut_val of shortcut_handlers){
       let [key, handler] = shortcut_val;
       if(key) {
-        this.shortcuts[this.shortcutKey(key.alt, key.ctrl_is_meta ? false : key.control, key.shift, Boolean(key.ctrl_is_meta), key.key.key_code)] = handler;
+        this.shortcuts[this.shortcutKey(key.alt, (isMac() && key.ctrl_is_meta) ? false : key.control, key.shift, isMac() && Boolean(key.ctrl_is_meta), key.key.key_code)] = handler;
       }
     }
   }
@@ -366,7 +367,7 @@ export default class ERDTool extends React.Component {
           closeModal={closeModal}
           text={gettext('The diagram has changed. Do you want to save changes?')}
           onDontSave={()=>{
-            bodyObj.forceClose();
+            this.forceClose();
           }}
           onSave={()=>{
             bodyObj.onSaveDiagram(false, true);
@@ -886,13 +887,11 @@ export default class ERDTool extends React.Component {
     return (
       <StyledBox ref={this.containerRef} height="100%" display="flex" flexDirection="column">
         <BeforeUnload
+          onInit={({forceClose})=>{this.forceClose = forceClose;}}
           enabled={this.state.is_close_tab_warning}
           isNewTab={this.state.is_new_tab}
-          beforeClose={()=>{
-            this.confirmBeforeClose();
-          }}
+          beforeClose={this.confirmBeforeClose}
           closePanel={this.closePanel}
-          getForceClose={(fn)=>this.forceClose = fn}
         />
         <ConnectionBar status={this.state.conn_status} bgcolor={this.props.params.bgcolor}
           fgcolor={this.props.params.fgcolor} title={_.unescape(this.props.params.title)}/>
