@@ -2371,9 +2371,9 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@mui/icons-material@npm:^5.15.10":
-  version: 5.16.5
-  resolution: "@mui/icons-material@npm:5.16.5"
+"@mui/icons-material@npm:^5.16.6":
+  version: 5.16.6
+  resolution: "@mui/icons-material@npm:5.16.6"
   dependencies:
     "@babel/runtime": ^7.23.9
   peerDependencies:
@@ -2383,7 +2383,7 @@ __metadata:
   peerDependenciesMeta:
     "@types/react":
       optional: true
-  checksum: 014a5184b393d851f0127fe1eb0593f107e1d76b2741ee2bfb86e9a9f38da396d988623534b87a34dec62f7560f09290a33f89778d5e6200daa878dd55a70a0f
+  checksum: e788a0cc23346f223c8b16a1832811246a476cc8edc089f7ed31ca6af96b8e546f7e2ea2150d6b3f1f0f1fc24151b9adb6ddb9439468d3597b8bdd2638d1e136
   languageName: node
   linkType: hard
 
@@ -2834,14 +2834,14 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@react-leaflet/core@npm:^1.1.1":
-  version: 1.1.1
-  resolution: "@react-leaflet/core@npm:1.1.1"
+"@react-leaflet/core@npm:^2.1.0":
+  version: 2.1.0
+  resolution: "@react-leaflet/core@npm:2.1.0"
   peerDependencies:
-    leaflet: ^1.7.1
-    react: ^17.0.1
-    react-dom: ^17.0.1
-  checksum: 2fc4a80e5524f9437ac6cef0f95e63388f2df6ecc5107fef85fd097eb2455436e796d41a4c43cdcbb983a4132403646823ba1dc0d953e866eb80808cbfaf0232
+    leaflet: ^1.9.0
+    react: ^18.0.0
+    react-dom: ^18.0.0
+  checksum: c11a15fb71a9929b809f346d8f784d0f32afa373bc096aa1f0d0fa6a2ef0ce632a563c31876abf8b255a12a19d6e80ece31e2ef505f79a678bbf073e7a6c5c60
   languageName: node
   linkType: hard
 
@@ -3107,15 +3107,15 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@tanstack/react-virtual@npm:^3.4.0":
-  version: 3.8.3
-  resolution: "@tanstack/react-virtual@npm:3.8.3"
+"@tanstack/react-virtual@npm:^3.8.4":
+  version: 3.8.4
+  resolution: "@tanstack/react-virtual@npm:3.8.4"
   dependencies:
-    "@tanstack/virtual-core": 3.8.3
+    "@tanstack/virtual-core": 3.8.4
   peerDependencies:
     react: ^16.8.0 || ^17.0.0 || ^18.0.0
     react-dom: ^16.8.0 || ^17.0.0 || ^18.0.0
-  checksum: ab1c7d2f7237451140b310d2e9201b62eecd3c90c3fbef79f8670e687f5e52b68d513e3bcd837d8d123375deaa5e2b505ffa382ce301a755460862db63073ceb
+  checksum: 297bcc941d307662f513eb724431ca863857872f6c77805049dff5633c57620feb43a51b2d4da988c6c8dc607ea4144e42eed6e1ea2561e6b607b2af998bf7f3
   languageName: node
   linkType: hard
 
@@ -3126,10 +3126,10 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@tanstack/virtual-core@npm:3.8.3":
-  version: 3.8.3
-  resolution: "@tanstack/virtual-core@npm:3.8.3"
-  checksum: 32493f4e8ade6219044353e3b801c89f5d3d499cfcee5cd1b595db95ad58a4b8fedb183b2d60a0711b072da60f74fa07d8c599b5de7d563a60aa0e26a294a848
+"@tanstack/virtual-core@npm:3.8.4":
+  version: 3.8.4
+  resolution: "@tanstack/virtual-core@npm:3.8.4"
+  checksum: 6774e50582410b913feb8fc7f0e39e1e57e8a72a97f6b96e354a2a9affe9679a8283ac1e8a0616eb0e63b9851aed7040d184e4eb13ed14fe7342d1497574caed
   languageName: node
   linkType: hard
 
@@ -3871,6 +3871,40 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@xterm/addon-fit@npm:^0.10.0":
+  version: 0.10.0
+  resolution: "@xterm/addon-fit@npm:0.10.0"
+  peerDependencies:
+    "@xterm/xterm": ^5.0.0
+  checksum: 8edfad561c0d0316c5883cbe2ce56109f105a2b2bf53b71d5f8c788e656a3205c1093a659dddcf4025a459e4b7ff8e07b6c6a19815c8711deeded560de5f1893
+  languageName: node
+  linkType: hard
+
+"@xterm/addon-search@npm:^0.15.0":
+  version: 0.15.0
+  resolution: "@xterm/addon-search@npm:0.15.0"
+  peerDependencies:
+    "@xterm/xterm": ^5.0.0
+  checksum: d4f77e3637f915e86c9208da70f615f5e6150810943931a4bba8a3422d5c2b791b84d2136de65603dbc4437328f4c584c8faa1f53e71524dd667bee631ca3f1e
+  languageName: node
+  linkType: hard
+
+"@xterm/addon-web-links@npm:^0.11.0":
+  version: 0.11.0
+  resolution: "@xterm/addon-web-links@npm:0.11.0"
+  peerDependencies:
+    "@xterm/xterm": ^5.0.0
+  checksum: c1b36b649b8cddc613213eb9e835daf3106a8be359a19ccacca1f1d9ff883b59d478f166109ee017fa3994d224dcdd82976ad5d5a1221271ab8d3d5684eb141d
+  languageName: node
+  linkType: hard
+
+"@xterm/xterm@npm:^5.5.0":
+  version: 5.5.0
+  resolution: "@xterm/xterm@npm:5.5.0"
+  checksum: 393c1891b95fdd50d05e7a063abdc95a6643d2c45a4231637c23db90511426a95b1b56a5c4c91831121d2710aee9de97cf5e426016c589ca87dea8fff9a41b33
+  languageName: node
+  linkType: hard
+
 "@xtuc/ieee754@npm:^1.2.0":
   version: 1.2.0
   resolution: "@xtuc/ieee754@npm:1.2.0"
@@ -4462,14 +4496,14 @@ __metadata:
   languageName: node
   linkType: hard
 
-"axios@npm:^1.7.2":
-  version: 1.7.2
-  resolution: "axios@npm:1.7.2"
+"axios@npm:^1.7.4":
+  version: 1.7.4
+  resolution: "axios@npm:1.7.4"
   dependencies:
     follow-redirects: ^1.15.6
     form-data: ^4.0.0
     proxy-from-env: ^1.1.0
-  checksum: e457e2b0ab748504621f6fa6609074ac08c824bf0881592209dfa15098ece7e88495300e02cd22ba50b3468fd712fe687e629dcb03d6a3f6a51989727405aedf
+  checksum: 0c17039a9acfe6a566fca8431ba5c1b455c83d30ea6157fec68a6722878fcd30f3bd32d172f6bee0c51fe75ca98e6414ddcd968a87b5606b573731629440bfaf
   languageName: node
   linkType: hard
 
@@ -10179,7 +10213,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"leaflet@npm:^1.5.1":
+"leaflet@npm:^1.9.4":
   version: 1.9.4
   resolution: "leaflet@npm:1.9.4"
   checksum: bfc79f17a247b37b92d84b3c78702501603392d6589fde606de4a825d11f1609d90225388834f2e0709dac327e52dcd4b4b9cc9fd3d590060c5b1e53b84fa6c6
@@ -10231,7 +10265,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"loader-utils@npm:^1.0.3, loader-utils@npm:^1.1.0":
+"loader-utils@npm:^1.1.0":
   version: 1.4.2
   resolution: "loader-utils@npm:1.4.2"
   dependencies:
@@ -13401,16 +13435,16 @@ __metadata:
   languageName: node
   linkType: hard
 
-"react-leaflet@npm:^3.2.2":
-  version: 3.2.5
-  resolution: "react-leaflet@npm:3.2.5"
+"react-leaflet@npm:^4.2.1":
+  version: 4.2.1
+  resolution: "react-leaflet@npm:4.2.1"
   dependencies:
-    "@react-leaflet/core": ^1.1.1
+    "@react-leaflet/core": ^2.1.0
   peerDependencies:
-    leaflet: ^1.7.1
-    react: ^17.0.1
-    react-dom: ^17.0.1
-  checksum: 503b7cee8acc12e0e2c5e7675432e7ef5742463e3e5420282ce60a9efd306430caefae3cb282c976e3df7665f19aef5b49cdce44a034979b4ea3ee968c2621d2
+    leaflet: ^1.9.0
+    react: ^18.0.0
+    react-dom: ^18.0.0
+  checksum: 79222c2ba0c62facaa3dfee18f7a692f917a4fb744ba8d22269a77f9779fc9634962230eb51265ff2563a1a5e3287d2ec16640ee7f5de459458027e05cd756ba
   languageName: node
   linkType: hard
 
@@ -13956,7 +13990,7 @@ __metadata:
     "@emotion/styled": ^11.11.0
     "@emotion/utils": ^1.0.0
     "@fortawesome/fontawesome-free": latest
-    "@mui/icons-material": ^5.15.10
+    "@mui/icons-material": ^5.16.6
     "@mui/lab": ^5.0.0-alpha.165
     "@mui/material": ^5.15.10
     "@mui/x-date-pickers": ^7.7.1
@@ -13966,7 +14000,7 @@ __metadata:
     "@szhsin/react-menu": ^2.2.0
     "@tanstack/react-query": 5.37.1
     "@tanstack/react-table": ^8.16.0
-    "@tanstack/react-virtual": ^3.4.0
+    "@tanstack/react-virtual": ^3.8.4
     "@testing-library/dom": 10.2.0
     "@testing-library/jest-dom": ^6.4.6
     "@testing-library/react": 16.0.0
@@ -13975,11 +14009,15 @@ __metadata:
     "@types/jest": ^29.5.4
     "@types/react": ^18.0.2
     "@types/react-dom": ^18.0.0
+    "@xterm/addon-fit": ^0.10.0
+    "@xterm/addon-search": ^0.15.0
+    "@xterm/addon-web-links": ^0.11.0
+    "@xterm/xterm": ^5.5.0
     ajv: ^8.8.2
     anti-trojan-source: ^1.4.0
     aspen-decorations: ^1.0.2
     autoprefixer: ^10.2.4
-    axios: ^1.7.2
+    axios: ^1.7.4
     axios-mock-adapter: ^1.17.0
     babel-loader: ^9.1.3
     babelify: ~10.0.0
@@ -14020,7 +14058,7 @@ __metadata:
     jest-environment-jsdom: ^29.6.4
     json-bignumber: ^1.0.1
     jsoneditor: ^9.5.4
-    leaflet: ^1.5.1
+    leaflet: ^1.9.4
     loader-utils: ^3.2.1
     lodash: 4.*
     mini-css-extract-plugin: ^2.7.6
@@ -14045,7 +14083,7 @@ __metadata:
     react-draggable: ^4.4.6
     react-dropzone: ^14.2.1
     react-frame-component: ^5.2.6
-    react-leaflet: ^3.2.2
+    react-leaflet: ^4.2.1
     react-new-window: ^1.0.1
     react-resize-detector: ^11.0.1
     react-rnd: ^10.3.5
@@ -14061,8 +14099,8 @@ __metadata:
     style-loader: ^3.3.2
     styled-components: ^5.2.1
     stylis: ^4.0.7
-    svgo: ^2.7.0
-    svgo-loader: ^2.2.0
+    svgo: ^3.3.2
+    svgo-loader: ^4.0.0
     terser-webpack-plugin: ^5.1.1
     typescript: ^5.4.5
     typescript-eslint: ^7.15.0
@@ -14075,10 +14113,6 @@ __metadata:
     webpack-bundle-analyzer: ^4.8.0
     webpack-cli: ^5.1.4
     wkx: ^0.5.0
-    xterm: ^4.11.0
-    xterm-addon-fit: ^0.5.0
-    xterm-addon-search: ^0.8.0
-    xterm-addon-web-links: ^0.4.0
     yarn-audit-html: 4.0.0
     zustand: ^4.4.1
   languageName: unknown
@@ -15170,15 +15204,12 @@ __metadata:
   languageName: node
   linkType: hard
 
-"svgo-loader@npm:^2.2.0":
-  version: 2.2.2
-  resolution: "svgo-loader@npm:2.2.2"
+"svgo-loader@npm:^4.0.0":
+  version: 4.0.0
+  resolution: "svgo-loader@npm:4.0.0"
   dependencies:
-    js-yaml: ^3.13.1
-    loader-utils: ^1.0.3
-  peerDependencies:
-    svgo: ^1.0.0
-  checksum: 628e722549fe6b4dfe682418efe030092f560dfc6de3a497093cf1214fd2d08eb851f8cd80de74e6c5d7efa678a4cf912d52d82cdf5712e64a0f890af35ea5af
+    svgo: ^3.0.0
+  checksum: c5c86d7b8d302cbdce16a534576aee8c630c4a12323f46597a29b3e83befde30faadb63740273d873d32a805b0b1b0458c3ec5c3500344541e3677f7c51065c6
   languageName: node
   linkType: hard
 
@@ -15199,7 +15230,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"svgo@npm:^3.0.2, svgo@npm:^3.2.0":
+"svgo@npm:^3.0.0, svgo@npm:^3.0.2, svgo@npm:^3.2.0, svgo@npm:^3.3.2":
   version: 3.3.2
   resolution: "svgo@npm:3.3.2"
   dependencies:
@@ -16511,40 +16542,6 @@ __metadata:
   version: 4.0.2
   resolution: "xtend@npm:4.0.2"
   checksum: ac5dfa738b21f6e7f0dd6e65e1b3155036d68104e67e5d5d1bde74892e327d7e5636a076f625599dc394330a731861e87343ff184b0047fef1360a7ec0a5a36a
-  languageName: node
-  linkType: hard
-
-"xterm-addon-fit@npm:^0.5.0":
-  version: 0.5.0
-  resolution: "xterm-addon-fit@npm:0.5.0"
-  peerDependencies:
-    xterm: ^4.0.0
-  checksum: 884d9f360893335c87e4514beeda2af6dbebf38a89b8518f1126d9c4611aefc1598b750bb43a953b79fdf1179c40d70c77a9169ae10f07e0abbbdb39b919b33f
-  languageName: node
-  linkType: hard
-
-"xterm-addon-search@npm:^0.8.0":
-  version: 0.8.2
-  resolution: "xterm-addon-search@npm:0.8.2"
-  peerDependencies:
-    xterm: ^4.0.0
-  checksum: cb5fa8a551354d98d81c3f4792a43150670be119a0bf10fdff6727ee80ba2524682371f828bb175bd71075ca45989805560754bb22a30ed87d59725b7910cf1c
-  languageName: node
-  linkType: hard
-
-"xterm-addon-web-links@npm:^0.4.0":
-  version: 0.4.0
-  resolution: "xterm-addon-web-links@npm:0.4.0"
-  peerDependencies:
-    xterm: ^4.0.0
-  checksum: 7bcb489b2b406602a3aa4bde4394379e24820a9a25503e24e78fa5b9301b8aea64c7851c91d5b9d27784f7a5bd6da5d81588f149f5379641bf97857e65e1f2d0
-  languageName: node
-  linkType: hard
-
-"xterm@npm:^4.11.0":
-  version: 4.19.0
-  resolution: "xterm@npm:4.19.0"
-  checksum: 4385e08d6f1e26d0db295ba55f0ed9c304686a72c2cfdd32502cf59de23ae9c93434d469fc3735f44375602f209f767a1ba643a86be6f8e0f1cf7e5bfdccde87
   languageName: node
   linkType: hard
 
