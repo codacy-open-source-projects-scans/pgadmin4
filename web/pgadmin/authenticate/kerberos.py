@@ -31,7 +31,6 @@ from pgadmin.authenticate.internal import BaseAuthentication
 from pgadmin.authenticate import get_auth_sources
 from pgadmin.utils.csrf import pgCSRFProtect
 
-
 try:
     import gssapi
     KERBEROS_AUTH_AVAILABLE = True
