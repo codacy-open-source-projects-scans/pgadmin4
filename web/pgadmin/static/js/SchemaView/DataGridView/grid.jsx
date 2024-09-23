@@ -33,7 +33,9 @@ import CustomPropTypes from 'sources/custom_prop_types';
 
 import { StyleDataGridBox } from '../StyledComponents';
 import { SchemaStateContext } from '../SchemaState';
-import { useFieldOptions, useFieldValue } from '../hooks';
+import {
+  useFieldOptions, useFieldValue, useSchemaStateSubscriber,
+} from '../hooks';
 import { registerView } from '../registry';
 import { listenDepChanges } from '../utils';
 
@@ -49,20 +51,16 @@ export default function DataGridView({
 }) {
   const pgAdmin = usePgAdmin();
   const [refreshKey, setRefreshKey] = useState(0);
+  const subscriberManager = useSchemaStateSubscriber(setRefreshKey);
   const schemaState = useContext(SchemaStateContext);
-  const options = useFieldOptions(
-    accessPath, schemaState, refreshKey, setRefreshKey
-  );
+  const options = useFieldOptions(accessPath, schemaState, subscriberManager);
   const value = useFieldValue(accessPath, schemaState);
   const schema = field.schema;
   const features = useRef();
 
   // Update refresh key on changing the number of rows.
   useFieldValue(
-    [...accessPath, 'length'], schemaState, refreshKey,
-    (newKey) => {
-      setRefreshKey(newKey);
-    } 
+    [...accessPath, 'length'], schemaState, subscriberManager
   );
 
   useEffect(() => {
@@ -72,7 +70,8 @@ export default function DataGridView({
     );
   }, [refreshKey]);
 
-  listenDepChanges(accessPath, field, options.visible, schemaState);
+  // We won't refresh the whole grid on dependent changes.
+  listenDepChanges(accessPath, field, schemaState);
 
   if (!features.current) {
     features.current = new FeatureSet();

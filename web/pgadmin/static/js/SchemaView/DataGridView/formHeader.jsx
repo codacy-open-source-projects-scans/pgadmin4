@@ -36,6 +36,19 @@ const StyledBox = styled(Box)(({theme}) => ({
   '& .DataGridFormHeader-border': {
     ...theme.mixins.panelBorder,
     borderBottom: 0,
+    '& .DataGridFormHeader-gridHeader': {
+      display: 'flex',
+      flexWrap: 'wrap',
+    },
+    '& .DataGridView-gridHeaderText': {
+      padding: theme.spacing(0.5, 1),
+      fontWeight: theme.typography.fontWeightBold,
+    },
+    '& .DataGridFormHeader-gridHeader-search': {
+      flex: 1,
+      padding: 0,
+      display: 'flex',
+    },
     '& .DataGridFormHeader-body': {
       padding: '0',
       backgroundColor: theme.palette.grey[400],
@@ -64,16 +77,19 @@ export function DataGridFormHeader({tableEleRef}) {
     viewHelperProps,
   } = useContext(DataGridContext);
   const {
-    addOnTop, canAddRow, canEdit, expandEditOnAdd, headerFormVisible
+    canAdd, addOnTop, canAddRow, canEdit, expandEditOnAdd, headerFormVisible
   } = options;
   const rows = table.getRowModel().rows;
 
   const label = field.label || '';
   const newRowIndex = useRef(-1);
   const schemaState = useContext(SchemaStateContext);
-  const headerFormData = useRef({});
-  const [addDisabled, setAddDisabled] = useState(canAddRow);
+  const [addDisabled, setAddDisabled] = useState(!canAdd || !canAddRow);
   const {headerSchema} = field;
+  const disableAddButton = (flag) => {
+    if (!canAdd || !canAddRow) return;
+    setAddDisabled(flag);
+  };
 
   const onAddClick = useCallback(() => {
 
@@ -81,7 +97,7 @@ export function DataGridFormHeader({tableEleRef}) {
       return;
     }
 
-    let newRow = headerSchema.getNewData(headerFormData.current);
+    let newRow = headerSchema.getNewData(headerSchema.state.data);
 
     newRowIndex.current = addOnTop ? 0 : rows.length;
 
@@ -125,9 +141,9 @@ export function DataGridFormHeader({tableEleRef}) {
   return (
     <StyledBox>
       <Box className='DataGridFormHeader-border'>
-        <Box className='DataGridView-gridHeader'>
+        <Box className='DataGridFormHeader-gridHeader'>
           {label && <Box className='DataGridView-gridHeaderText'>{label}</Box>}
-          <Box className='DataGridView-gridHeaderText' style={{flex: 1}}>
+          <Box className='DataGridFormHeader-gridHeader-search'>
             <SearchBox/>
           </Box>
         </Box>
@@ -139,10 +155,9 @@ export function DataGridFormHeader({tableEleRef}) {
             schema={headerSchema}
             viewHelperProps={viewHelperProps}
             showFooter={false}
-            onDataChange={(isDataChanged, dataChanged)=>{
-              headerFormData.current = dataChanged;
-              setAddDisabled(
-                canAddRow && headerSchema.addDisabled(headerFormData.current)
+            onDataChange={()=>{
+              disableAddButton(
+                headerSchema.addDisabled(headerSchema.state.data)
               );
             }}
             hasSQL={false}

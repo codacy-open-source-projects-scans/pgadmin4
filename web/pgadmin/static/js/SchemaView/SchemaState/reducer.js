@@ -64,7 +64,9 @@ export const sessDataReducer = (state, action) => {
     _.set(data, action.path, action.value);
     // If there is any dep listeners get the changes.
     data = getDepChange(action.path, data, state, action);
-    deferredList = getDeferredDepChange(action.path, data, state, action);
+    deferredList = getDeferredDepChange(
+      action.path, _.cloneDeep(data), state, action
+    );
     data.__deferred__ = deferredList || [];
     break;
 
@@ -112,7 +114,7 @@ export const sessDataReducer = (state, action) => {
     return data;
 
   case SCHEMA_STATE_ACTIONS.DEFERRED_DEPCHANGE:
-    data = getDepChange(action.path, data, state, action);
+    data = getDepChange(action.path, _.cloneDeep(data), state, action);
     break;
   }
 

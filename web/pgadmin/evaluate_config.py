@@ -10,6 +10,7 @@
 import os
 import sys
 import keyring
+import email_validator
 
 # User configs loaded from config_local, config_distro etc.
 custom_config_settings = {}

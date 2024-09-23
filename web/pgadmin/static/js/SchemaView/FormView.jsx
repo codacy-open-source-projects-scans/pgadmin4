@@ -27,7 +27,9 @@ import { FieldControl } from './FieldControl';
 import { SQLTab } from './SQLTab';
 import { FormContentBox } from './StyledComponents';
 import { SchemaStateContext } from './SchemaState';
-import { useFieldSchema, useFieldValue } from './hooks';
+import {
+  useFieldSchema, useFieldValue, useSchemaStateSubscriber,
+} from './hooks';
 import { registerView, View } from './registry';
 import { createFieldControls, listenDepChanges } from './utils';
 
@@ -62,10 +64,11 @@ export default function FormView({
   showError=false, resetKey, focusOnFirstInput=false
 }) {
   const [key, setKey] = useState(0);
+  const subscriberManager = useSchemaStateSubscriber(setKey);
   const schemaState = useContext(SchemaStateContext);
   const value = useFieldValue(accessPath, schemaState);
   const { visible } = useFieldSchema(
-    field, accessPath, value, viewHelperProps, schemaState, key, setKey
+    field, accessPath, value, viewHelperProps, schemaState, subscriberManager
   );
 
   const [tabValue, setTabValue] = useState(0);
@@ -98,6 +101,7 @@ export default function FormView({
         'select:not(disabled)',
         'textarea',
         '[tabindex]:not([tabindex="-1"]):not([data-test="tabpanel"])',
+        'div[class="cm-content"]:not([aria-readonly="true"])',
       ].join(', '));
 
       if (firstFocussableElement) firstFocussableElement.focus();
@@ -106,13 +110,12 @@ export default function FormView({
 
   useEffect(() => {
     // Refresh on message changes.
-    return schemaState.subscribe(
-      ['errors', 'message'],
+    return subscriberManager.current?.add(
+      schemaState, ['errors', 'message'], 'states',
       (newState, prevState) => {
-        if (_.isUndefined(newState) || _.isUndefined(prevState));
-        setKey(Date.now());
-      },
-      'states'
+        if (_.isUndefined(newState) || _.isUndefined(prevState))
+          subscriberManager.current?.signal();
+      }
     );
   }, [key]);
 
@@ -131,7 +134,9 @@ export default function FormView({
     }
   }, [isOnScreen]);
   
-  listenDepChanges(accessPath, field, visible, schemaState);
+  listenDepChanges(
+    accessPath, field, schemaState, () => subscriberManager.current?.signal()
+  );
 
   // Upon reset, set the tab to first.
   useEffect(() => {

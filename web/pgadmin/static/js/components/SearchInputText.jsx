@@ -31,11 +31,14 @@ export const SearchInputText = ({
     placeholder: placeholder || gettext('Search'),
     style: {
       width: size == SEARCH_INPUT_SIZE.FULL ? '100%' : '50%',
-      float: alignment == SEARCH_INPUT_ALIGNMENT.RIGHT ? 'right' : 'left',
     },
     value: searchText,
     onChange,
   };
+  if (alignment == SEARCH_INPUT_ALIGNMENT.RIGHT)
+    props.style['marginLeft'] = 'auto';
+  else
+    props.style['marginRight'] = 'auto';
 
   return <InputText {...props}/>;
 };

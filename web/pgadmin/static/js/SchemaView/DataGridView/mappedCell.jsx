@@ -16,7 +16,9 @@ import { evalFunc } from 'sources/utils';
 import { MappedCellControl } from '../MappedControl';
 import { SCHEMA_STATE_ACTIONS, SchemaStateContext } from '../SchemaState';
 import { flatternObject } from '../common';
-import { useFieldOptions, useFieldValue } from '../hooks';
+import {
+  useFieldOptions, useFieldValue, useSchemaStateSubscriber
+} from '../hooks';
 import { listenDepChanges } from '../utils';
 
 import { DataGridContext, DataGridRowContext } from './context';
@@ -25,17 +27,25 @@ import { DataGridContext, DataGridRowContext } from './context';
 export function getMappedCell({field}) {
   const Cell = ({reRenderRow, getValue}) => {
 
-    const [key, setKey] = useState(0);
+    const [, setKey] = useState(0);
+    const subscriberManager = useSchemaStateSubscriber(setKey);
     const schemaState = useContext(SchemaStateContext);
     const { dataDispatch, accessPath } = useContext(DataGridContext);
     const { rowAccessPath, row } = useContext(DataGridRowContext);
     const colAccessPath = schemaState.accessPath(rowAccessPath, field.id);
 
-    let colOptions = useFieldOptions(colAccessPath, schemaState, key, setKey);
-    let value = useFieldValue(colAccessPath, schemaState, key, setKey);
+    let colOptions = useFieldOptions(
+      colAccessPath, schemaState, subscriberManager
+    );
+    let value = useFieldValue(colAccessPath, schemaState, subscriberManager);
     let rowValue = useFieldValue(rowAccessPath, schemaState);
+    const rerenderCellOnDepChange = (...args) => {
+      subscriberManager.current?.signal(...args);
+    };
 
-    listenDepChanges(colAccessPath, field, true, schemaState);
+    const depVals = listenDepChanges(
+      colAccessPath, field, schemaState, rerenderCellOnDepChange
+    );
 
     if (!field.id) {
       console.error(`No id set for the field: ${field}`);
@@ -43,7 +53,7 @@ export function getMappedCell({field}) {
       rowValue = row.original;
       colOptions = { disabled: true, readonly: true };
     } else {
-      colOptions['readonly'] = !colOptions['editable'];
+      colOptions = {...colOptions, readonly: !colOptions['editable']};
     }
 
     let cellProps = {};
@@ -65,7 +75,6 @@ export function getMappedCell({field}) {
       row,
       dataDispatch,
       onCellChange: (changeValue) => {
-        if (colOptions.disabled) return;
         if(field.radioType) {
           dataDispatch({
             type: SCHEMA_STATE_ACTIONS.BULK_UPDATE,
@@ -90,7 +99,7 @@ export function getMappedCell({field}) {
 
     return useMemo(
       () => <MappedCellControl {...props}/>,
-      [...flatternObject(colOptions), value, row.index]
+      [...(depVals || []), ...flatternObject(colOptions), value, row.index]
     );
   };
 
