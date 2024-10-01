@@ -37,6 +37,7 @@ const StyledPgReactDataGrid = styled(PgReactDataGrid)(({theme})=>({
     '& .QueryTool-columnName': {
       fontWeight: 'bold',
     },
+    backgroundColor: theme.palette.grey[600],
   },
   '& .QueryTool-editedCell': {
     fontWeight: 'bold',
@@ -53,6 +54,8 @@ const StyledPgReactDataGrid = styled(PgReactDataGrid)(({theme})=>({
   },
   '& .QueryTool-rowNumCell': {
     padding: '0px 8px',
+    fontWeight: 900,
+    color: theme.otherVars.tree.textFg,
   },
   '& .QueryTool-colHeaderSelected': {
     outlineColor: theme.palette.primary.main,
@@ -63,7 +66,24 @@ const StyledPgReactDataGrid = styled(PgReactDataGrid)(({theme})=>({
     outlineColor: theme.palette.primary.main,
     backgroundColor: theme.palette.primary.light,
     color: theme.otherVars.qtDatagridSelectFg,
-  }
+  },
+  '& .rdg-row': {
+    '&:nth-of-type(even)': {
+      backgroundColor: theme.palette.grey[200],
+    },
+    '& .rdg-cell:nth-of-type(1)': {
+      backgroundColor: theme.palette.grey[600],
+    },
+    '& .rdg-cell:nth-of-type(1)[aria-selected="true"]':{
+      backgroundColor: theme.palette.primary.main,
+      color: theme.palette.primary.contrastText,
+    },
+  },
+  '& .rdg-header-row': {
+    '& .rdg-cell:nth-of-type(1)': {
+      backgroundColor: theme.palette.grey[600]
+    },
+  },
 }));
 
 export const RowInfoContext = React.createContext();
@@ -119,9 +139,8 @@ function SelectAllHeaderRenderer({isCellSelected}) {
   const eventBus = useContext(QueryToolEventsContext);
   const dataGridExtras = useContext(DataGridExtrasContext);
   const onClick = ()=>{
-    eventBus.fireEvent(QUERY_TOOL_EVENTS.FETCH_MORE_ROWS, true, ()=>{
-      onRowSelectionChange({ type: 'HEADER', checked: !isRowSelected });
-    });
+    onRowSelectionChange({ type: 'HEADER', checked: !isRowSelected });
+    eventBus.fireEvent(QUERY_TOOL_EVENTS.ALL_PAGE_ROWS_SELECTED, !isRowSelected);
   };
 
   useLayoutEffect(() => {
@@ -129,8 +148,17 @@ function SelectAllHeaderRenderer({isCellSelected}) {
     cellRef.current?.focus({ preventScroll: true });
   }, [isCellSelected]);
 
+  useEffect(()=>{
+    const unregClear = eventBus.registerListener(QUERY_TOOL_EVENTS.CLEAR_ROWS_SELECTED, ()=>{
+      onRowSelectionChange({ type: 'HEADER', checked: false });
+    });
+    return ()=>{
+      unregClear();
+    };
+  }, []);
+
   return <div ref={cellRef} style={{width: '100%', height: '100%'}} onClick={onClick}
-    tabIndex="-1" onKeyDown={getCopyShortcutHandler(dataGridExtras.handleCopy)}></div>;
+    tabIndex="0" onKeyDown={getCopyShortcutHandler(dataGridExtras.handleCopy)}></div>;
 }
 SelectAllHeaderRenderer.propTypes = {
   onAllRowsSelectionChange: PropTypes.func,
@@ -147,15 +175,13 @@ function SelectableHeaderRenderer({column, selectedColumns, onSelectedColumnsCha
   }
 
   const onClick = ()=>{
-    eventBus.fireEvent(QUERY_TOOL_EVENTS.FETCH_MORE_ROWS, true, ()=>{
-      const newSelectedCols = new Set(selectedColumns);
-      if (newSelectedCols.has(column.idx)) {
-        newSelectedCols.delete(column.idx);
-      } else {
-        newSelectedCols.add(column.idx);
-      }
-      onSelectedColumnsChange(newSelectedCols);
-    });
+    const newSelectedCols = new Set(selectedColumns);
+    if (newSelectedCols.has(column.idx)) {
+      newSelectedCols.delete(column.idx);
+    } else {
+      newSelectedCols.add(column.idx);
+    }
+    onSelectedColumnsChange(newSelectedCols);
   };
 
   const isSelected = selectedColumns.has(column.idx);
@@ -276,9 +302,10 @@ function initialiseColumns(columns, rows, totalRowCount, columnWidthBy) {
 }
 function RowNumColFormatter({row, rowKeyGetter, rowIdx, dataChangeStore, onSelectedColumnsChange}) {
   const [isRowSelected, onRowSelectionChange] = useRowSelection();
+  const {startRowNum} = useContext(DataGridExtrasContext);
 
   let rowKey = rowKeyGetter(row);
-  let rownum = rowIdx+1;
+  let rownum = rowIdx+(startRowNum??1);
   if(rowKey in (dataChangeStore?.added || {})) {
     rownum = rownum+'+';
   } else if(rowKey in (dataChangeStore?.deleted || {})) {
@@ -294,6 +321,7 @@ function RowNumColFormatter({row, rowKeyGetter, rowIdx, dataChangeStore, onSelec
 RowNumColFormatter.propTypes = {
   row: PropTypes.object,
   rowKeyGetter: PropTypes.func,
+  rowIdx: PropTypes.number,
   dataChangeStore: PropTypes.object,
   onSelectedColumnsChange: PropTypes.func,
 };
@@ -355,7 +383,7 @@ function getTextWidth(column, rows, canvas, columnWidthBy) {
 }
 
 export default function QueryToolDataGrid({columns, rows, totalRowCount, dataChangeStore,
-  onSelectedCellChange, selectedColumns, onSelectedColumnsChange, columnWidthBy, ...props}) {
+  onSelectedCellChange, selectedColumns, onSelectedColumnsChange, columnWidthBy, startRowNum, ...props}) {
   const [readyColumns, setReadyColumns] = useState([]);
   const eventBus = useContext(QueryToolEventsContext);
   const onSelectedColumnsChangeWrapped = (arg)=>{
@@ -372,7 +400,7 @@ export default function QueryToolDataGrid({columns, rows, totalRowCount, dataCha
   }, []);
 
   const dataGridExtras = useMemo(()=>({
-    onSelectedCellChange, handleCopy
+    onSelectedCellChange, handleCopy, startRowNum
   }), [onSelectedCellChange]);
 
   useEffect(()=>{
@@ -433,4 +461,5 @@ QueryToolDataGrid.propTypes = {
   onSelectedColumnsChange: PropTypes.func,
   rowKeyGetter: PropTypes.func,
   columnWidthBy: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+  startRowNum: PropTypes.number,
 };
