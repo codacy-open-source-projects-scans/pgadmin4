@@ -1,3 +1,12 @@
+/////////////////////////////////////////////////////////////
+//
+// pgAdmin 4 - PostgreSQL Tools
+//
+// Copyright (C) 2013 - 2024, The pgAdmin Development Team
+// This software is released under the PostgreSQL Licence
+//
+//////////////////////////////////////////////////////////////
+
 import React, { useRef, useMemo, useEffect, useCallback, useState } from 'react';
 import DockLayout from 'rc-dock';
 import PropTypes from 'prop-types';
@@ -15,6 +24,8 @@ import ContextMenu from '../../components/ContextMenu';
 import { showRenameTab } from '../../Dialogs';
 import usePreferences from '../../../../preferences/static/js/store';
 import _ from 'lodash';
+import UtilityView from '../../UtilityView';
+import ToolView from '../../ToolView';
 
 function TabTitle({id, closable, defaultInternal}) {
   const layoutDocker = React.useContext(LayoutDockerContext);
@@ -372,7 +383,7 @@ export function getDefaultGroup() {
   };
 }
 
-export default function Layout({groups, noContextGroups, getLayoutInstance, layoutId, savedLayout, resetToTabPanel, ...props}) {
+export default function Layout({groups, noContextGroups, getLayoutInstance, layoutId, savedLayout, resetToTabPanel, enableToolEvents=false, isLayoutVisible=true, ...props}) {
   const [[contextPos, contextPanelId, contextExtraMenus], setContextPos] = React.useState([null, null, null]);
   const defaultGroups = React.useMemo(()=>({
     'dialogs': getDialogsGroup(),
@@ -456,32 +467,38 @@ export default function Layout({groups, noContextGroups, getLayoutInstance, layo
 
   return (
     <LayoutDockerContext.Provider value={layoutDockerObj}>
-      {useMemo(()=>(<DockLayout
-        style={{
-          height: '100%',
-        }}
-        ref={(obj)=>{
-          if(obj) {
-            layoutDockerObj.layoutObj = obj;
-            getLayoutInstance?.(layoutDockerObj);
-            layoutDockerObj.loadLayout(savedLayout);
-          }
-        }}
-        groups={defaultGroups}
-        onLayoutChange={(l, currentTabId, direction)=>{
-          if(Object.values(LAYOUT_EVENTS).indexOf(direction) > -1) {
-            layoutDockerObj.eventBus.fireEvent(LAYOUT_EVENTS[direction.toUpperCase()], currentTabId);
-            layoutDockerObj.saveLayout(l);
-          } else if(direction && direction != 'update') {
-            layoutDockerObj.eventBus.fireEvent(LAYOUT_EVENTS.CHANGE, currentTabId);
-            layoutDockerObj.saveLayout(l);
-          }
-        }}
-        {...props}
-      />), [])}
+      <Box height="100%" width="100%" display={isLayoutVisible ? 'initial' : 'none'} >
+        {useMemo(()=>(<DockLayout
+          style={{
+            height: '100%',
+          }}
+          ref={(obj)=>{
+            if(obj) {
+              layoutDockerObj.layoutObj = obj;
+              getLayoutInstance?.(layoutDockerObj);
+              layoutDockerObj.loadLayout(savedLayout);
+            }
+          }}
+          groups={defaultGroups}
+          onLayoutChange={(l, currentTabId, direction)=>{
+            if(Object.values(LAYOUT_EVENTS).indexOf(direction) > -1) {
+              layoutDockerObj.eventBus.fireEvent(LAYOUT_EVENTS[direction.toUpperCase()], currentTabId);
+              layoutDockerObj.saveLayout(l);
+            } else if(direction && direction != 'update') {
+              layoutDockerObj.eventBus.fireEvent(LAYOUT_EVENTS.CHANGE, currentTabId);
+              layoutDockerObj.saveLayout(l);
+            }
+          }}
+          {...props}
+        />), [])}
+      </Box>
       <div id="layout-portal"></div>
       <ContextMenu menuItems={contextMenuItems} position={contextPos} onClose={()=>setContextPos([null, null, null])}
         label="Layout Context Menu" />
+      {enableToolEvents && <>
+        <UtilityView dockerObj={layoutDockerObj} />
+        <ToolView dockerObj={layoutDockerObj} />
+      </>}
     </LayoutDockerContext.Provider>
   );
 }
@@ -494,10 +511,13 @@ Layout.propTypes = {
   layoutId: PropTypes.string,
   savedLayout: PropTypes.string,
   resetToTabPanel: PropTypes.string,
+  enableToolEvents: PropTypes.bool,
+  isLayoutVisible: PropTypes.bool
 };
 
 
 export const LAYOUT_EVENTS = {
+  INIT: 'init',
   ACTIVE: 'active',
   REMOVE: 'remove',
   FLOAT: 'float',

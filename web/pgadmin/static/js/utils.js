@@ -15,6 +15,7 @@ import getApiInstance from './api_instance';
 import usePreferences from '../../preferences/static/js/store';
 import pgAdmin from 'sources/pgadmin';
 import { isMac } from './keyboard_shortcuts';
+import { WORKSPACES } from '../../browser/static/js/constants';
 
 export function parseShortcutValue(obj) {
   let shortcut = '';
@@ -415,21 +416,27 @@ export function checkTrojanSource(content, isPasteEvent) {
 }
 
 export function downloadBlob(blob, fileName) {
-  let urlCreator = window.URL || window.webkitURL,
-    downloadUrl = urlCreator.createObjectURL(blob),
-    link = document.createElement('a');
-
-  document.body.appendChild(link);
-
   if (getBrowser() == 'IE' && window.navigator.msSaveBlob) {
-  // IE10+ : (has Blob, but not a[download] or URL)
+    // IE10+ : (has Blob, but not a[download] or URL)
     window.navigator.msSaveBlob(blob, fileName);
   } else {
+    const urlCreator = window.URL || window.webkitURL;
+    const downloadUrl = urlCreator.createObjectURL(blob);
+
+    const link = document.createElement('a');
     link.setAttribute('href', downloadUrl);
     link.setAttribute('download', fileName);
+    link.style.setProperty('visibility ', 'hidden');
+
+    document.body.appendChild(link);
     link.click();
+    document.body.removeChild(link);
   }
-  document.body.removeChild(link);
+}
+
+export function downloadFile(textData, fileName, fileType) {
+  const respBlob = new Blob([textData], {type : fileType});
+  downloadBlob(respBlob, fileName);
 }
 
 export function toPrettySize(rawSize, from='B') {
@@ -600,34 +607,6 @@ export function fullHexColor(shortHex) {
   return shortHex;
 }
 
-export function gettextForTranslation(translations, ...replaceArgs) {
-  const text = replaceArgs[0];
-  let rawTranslation = translations[text] ? translations[text] : text;
-
-  if(arguments.length == 2) {
-    return rawTranslation;
-  }
-
-  try {
-    return rawTranslation.split('%s')
-      .map(function(w, i) {
-        if(i > 0) {
-          if(i < replaceArgs.length) {
-            return [replaceArgs[i], w].join('');
-          } else {
-            return ['%s', w].join('');
-          }
-        } else {
-          return w;
-        }
-      })
-      .join('');
-  } catch(e) {
-    console.error(e);
-    return rawTranslation;
-  }
-}
-
 // https://developer.mozilla.org/en-US/docs/Web/API/Window/cancelAnimationFrame
 const requestAnimationFrame =
   window.requestAnimationFrame ||
@@ -648,15 +627,15 @@ export function requestAnimationAndFocus(ele) {
   });
 }
 
-
-export function scrollbarWidth() {
-  // thanks too https://davidwalsh.name/detect-scrollbar-width
-  const scrollDiv = document.createElement('div');
-  scrollDiv.setAttribute('style', 'width: 100px; height: 100px; overflow: scroll; position:absolute; top:-9999px;');
-  document.body.appendChild(scrollDiv);
-  const scrollbarWidth = scrollDiv.offsetWidth - scrollDiv.clientWidth;
-  document.body.removeChild(scrollDiv);
-  return scrollbarWidth;
+export function measureText(text, font) {
+  if(!measureText.ele) {
+    measureText.ele = document.createElement('div');
+    measureText.ele.style.cssText = `position: absolute; visibility: hidden; white-space: nowrap; font: ${font}`;
+    document.body.appendChild(measureText.ele);
+  }
+  measureText.ele.innerHTML = text;
+  const dim = measureText.ele.getBoundingClientRect();
+  return {width: dim.width, height: dim.height};
 }
 
 const CHART_THEME_COLORS = {
@@ -676,6 +655,10 @@ export function getChartColor(index, theme='light', colorPalette=CHART_THEME_COL
   const palette = colorPalette[theme];
   // loop back if out of index;
   return palette[index % palette.length];
+}
+
+export function getRandomColor() {
+  return '#' + ((1 << 24) * Math.random() | 0).toString(16).padStart(6, '0');
 }
 
 // Using this function instead of 'btoa' directly.
@@ -748,4 +731,54 @@ export function getPlatform() {
   } else {
     return 'Unknown';
   }
+}
+
+export function isDefaultWorkspace() {
+  return pgAdmin.Browser?.docker?.currentWorkspace == WORKSPACES.DEFAULT;
+}
+
+/**
+ * Decimal adjustment of a number.
+ *
+ * @param {String}  type  The type of adjustment.
+ * @param {Number}  value The number.
+ * @param {Integer} exp   The exponent (the 10 logarithm of the adjustment base).
+ * @returns {Number} The adjusted value.
+ */
+function decimalAdjust(type, value, exp) {
+  // If the exp is undefined or zero...
+  if (typeof exp === 'undefined' || +exp === 0) {
+    return Math[type](value);
+  }
+  value = +value;
+  exp = +exp;
+  // If the value is not a number or the exp is not an integer...
+  if (isNaN(value) || exp % 1 !== 0) {
+    return NaN;
+  }
+  // Shift
+  value = value.toString().split('e');
+  value = Math[type](+(value[0] + 'e' + (value[1] ? (+value[1] - exp) : -exp)));
+  // Shift back
+  value = value.toString().split('e');
+  return +(value[0] + 'e' + (value[1] ? (+value[1] + exp) : exp));
+}
+
+// Decimal round
+if (!Math.round10) {
+  Math.round10 = function(value, exp) {
+    return decimalAdjust('round', value, exp);
+  };
+}
+// Decimal floor
+if (!Math.floor10) {
+  Math.floor10 = function(value, exp) {
+    return decimalAdjust('floor', value, exp);
+  };
+}
+// Decimal ceil
+if (!Math.ceil10) {
+  Math.ceil10 = function(value, exp) {
+    return decimalAdjust('ceil', value, exp);
+  };
 }

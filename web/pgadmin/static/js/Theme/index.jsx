@@ -170,10 +170,16 @@ basicSettings = createTheme(basicSettings, {
         disableGutters: true,
       }
     },
+    MuiListItemButton: {
+      defaultProps: {
+        disableGutters: true,
+        disableTouchRipple: true,
+      }
+    },
     MuiTabs: {
       styleOverrides: {
         root: {
-          minHeight: 0,
+          minHeight: '30px',
         }
       }
     },
@@ -242,6 +248,7 @@ basicSettings = createTheme(basicSettings, {
           marginBottom: 0,
           marginLeft: 0,
           marginRight: 0,
+          gap: '4px'
         }
       }
     },
@@ -639,6 +646,20 @@ function getFinalTheme(baseTheme) {
           }
         }
       },
+      MuiRadio: {
+        styleOverrides: {
+          root: {
+            padding: '0px',
+            color: baseTheme.otherVars.inputBorderColor,
+          },
+
+          colorPrimary: {
+            '&.Mui-disabled': {
+              color: baseTheme.palette.checkbox.disabled
+            }
+          }
+        }
+      },
       MuiToggleButton: {
         styleOverrides: {
           root: {
@@ -709,7 +730,7 @@ function getFinalTheme(baseTheme) {
           }
         }
       },
-      MuiListItem: {
+      MuiListItemButton: {
         styleOverrides: {
           root: {
             color: baseTheme.palette.text.primary,
@@ -731,6 +752,23 @@ function getFinalTheme(baseTheme) {
                 backgroundColor: baseTheme.palette.primary.light,
               }
             },
+          }
+        }
+      },
+      MuiListItem: {
+        styleOverrides: {
+          root: {
+            color: baseTheme.palette.text.primary,
+            backgroundColor: baseTheme.palette.background.default,
+            flexDirection: 'column',
+            alignItems: 'initial',
+            padding: '0px 4px',
+            paddingTop: '0px',
+            paddingBottom: '0px',
+            ...mixins.panelBorder.top,
+            ...mixins.panelBorder.bottom,
+            borderTopColor: 'transparent',
+            cursor: 'pointer',
           }
         }
       },

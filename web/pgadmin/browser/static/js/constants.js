@@ -41,7 +41,16 @@ export const BROWSER_PANELS = {
   GRANT_WIZARD: 'id-grant-wizard',
   SEARCH_OBJECTS: 'id-search-objects',
   USER_MANAGEMENT: 'id-user-management',
-  IMPORT_EXPORT_SERVERS: 'id-import-export-servers'
+  IMPORT_EXPORT_SERVERS: 'id-import-export-servers',
+  WELCOME_QUERY_TOOL: 'id-welcome-querytool',
+  WELCOME_PSQL_TOOL: 'id-welcome-psql'
+};
+
+export const WORKSPACES = {
+  DEFAULT: 'default_workspace',
+  QUERY_TOOL: 'query_tool_workspace',
+  PSQL_TOOL: 'psql_workspace',
+  SCHEMA_DIFF_TOOL: 'schema_diff_workspace'
 };
 
 export const WEEKDAYS = [
@@ -104,3 +113,5 @@ export const WEEKDAYS = [
     {label: gettext('52'), value: '52'}, {label: gettext('53'), value: '53'}, {label: gettext('54'), value: '54'}, {label: gettext('55'), value: '55'},
     {label: gettext('56'), value: '56'}, {label: gettext('57'), value: '57'}, {label: gettext('58'), value: '58'}, {label: gettext('59'), value: '59'},
   ];
+
+export const PGAGENT_MONTHDAYS = [...MONTHDAYS].concat([{label: gettext('Last day'), value: 'Last Day'}]);

@@ -10,7 +10,7 @@ import React, {useContext, useCallback, useEffect, useMemo } from 'react';
 import { format } from 'sql-formatter';
 import { QueryToolContext, QueryToolEventsContext } from '../QueryToolComponent';
 import CodeMirror from '../../../../../../static/js/components/ReactCodeMirror';
-import {PANELS, QUERY_TOOL_EVENTS} from '../QueryToolConstants';
+import { PANELS, QUERY_TOOL_EVENTS} from '../QueryToolConstants';
 import url_for from 'sources/url_for';
 import { LayoutDockerContext, LAYOUT_EVENTS } from '../../../../../../static/js/helpers/Layout';
 import ConfirmSaveContent from '../../../../../../static/js/Dialogs/ConfirmSaveContent';
@@ -18,7 +18,7 @@ import gettext from 'sources/gettext';
 import { isMac } from '../../../../../../static/js/keyboard_shortcuts';
 import { checkTrojanSource, isShortcutValue, parseKeyEventValue, parseShortcutValue } from '../../../../../../static/js/utils';
 import { parseApiError } from '../../../../../../static/js/api_instance';
-import { usePgAdmin } from '../../../../../../static/js/BrowserComponent';
+import { usePgAdmin } from '../../../../../../static/js/PgAdminProvider';
 import ConfirmPromotionContent from '../dialogs/ConfirmPromotionContent';
 import ConfirmExecuteQueryContent from '../dialogs/ConfirmExecuteQueryContent';
 import usePreferences from '../../../../../../preferences/static/js/store';
@@ -56,7 +56,7 @@ async function registerAutocomplete(editor, api, transId) {
   });
 }
 
-export default function Query({onTextSelect, handleEndOfLineChange}) {
+export default function Query({onTextSelect, setQtStatePartial}) {
   const editor = React.useRef();
   const eventBus = useContext(QueryToolEventsContext);
   const queryToolCtx = useContext(QueryToolContext);
@@ -187,10 +187,13 @@ export default function Query({onTextSelect, handleEndOfLineChange}) {
         editor.current.setValue(res.data);
         //Check the file content for Trojan Source
         checkTrojanSource(res.data);
-        editor.current.markClean();
         eventBus.fireEvent(QUERY_TOOL_EVENTS.LOAD_FILE_DONE, fileName, true);
-        const lineSep = res.data.includes('\r\n') ? 'crlf' : 'lf';
-        handleEndOfLineChange(lineSep);
+        // Detect line separator from content and editor's EOL.
+        const lineSep = editor.current?.detectEOL(res.data);
+        // Update the EOL if it differs from the current editor EOL
+        setQtStatePartial({ eol: lineSep });
+        // Mark the editor content as clean
+        editor.current?.markClean();
       }).catch((err)=>{
         eventBus.fireEvent(QUERY_TOOL_EVENTS.LOAD_FILE_DONE, null, false);
         pgAdmin.Browser.notifier.error(parseApiError(err));
@@ -290,8 +293,9 @@ export default function Query({onTextSelect, handleEndOfLineChange}) {
     });
 
     eventBus.registerListener(QUERY_TOOL_EVENTS.CHANGE_EOL, (lineSep)=>{
+      // Set the new EOL character in the editor.
       editor.current?.setEOL(lineSep);
-      eventBus.fireEvent(QUERY_TOOL_EVENTS.QUERY_CHANGED, true);
+      eventBus.fireEvent(QUERY_TOOL_EVENTS.QUERY_CHANGED, editor.current?.isDirty());    
     });
 
     eventBus.registerListener(QUERY_TOOL_EVENTS.EDITOR_TOGGLE_CASE, ()=>{
@@ -524,5 +528,5 @@ export default function Query({onTextSelect, handleEndOfLineChange}) {
 
 Query.propTypes = {
   onTextSelect: PropTypes.func,
-  handleEndOfLineChange: PropTypes.func
+  setQtStatePartial: PropTypes.func
 };

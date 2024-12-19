@@ -499,7 +499,7 @@ export default class ERDTool extends React.Component {
   }
 
   onDeleteNode() {
-    pgAdmin.Browser.notifier.confirm(
+    pgAdmin.Browser.notifier.confirmDelete(
       gettext('Delete ?'),
       gettext('You have selected %s tables and %s links.', this.diagram.getSelectedNodes().length, this.diagram.getSelectedLinks().length)
         + '<br />' + gettext('Are you sure you want to delete ?'),
@@ -512,16 +512,20 @@ export default class ERDTool extends React.Component {
         });
         if (this.diagram.getNodesData().length === 0){
           this.setState({dirty: false});
-          this.eventBus.fireEvent(ERD_EVENTS.DIRTY, false);  
+          this.eventBus.fireEvent(ERD_EVENTS.DIRTY, false);
         }
         this.diagram.repaint();
       },
-      () => {/*This is intentional (SonarQube)*/}
+      () => {/*This is intentional (SonarQube)*/},
+      gettext('Delete'),
+      gettext('Cancel'),
     );
   }
 
-  onAutoDistribute() {
-    this.diagram.dagreDistributeNodes();
+  async onAutoDistribute() {
+    this.setLoading('Auto distributing...');
+    await this.diagram.dagreDistributeNodes();
+    this.setLoading();
   }
 
   onChangeColors(fillColor, textColor) {
@@ -883,7 +887,9 @@ export default class ERDTool extends React.Component {
     } catch (error) {
       this.handleAxiosCatch(error);
     }
-    this.setLoading(null);
+    setTimeout(()=>{
+      this.onAutoDistribute();
+    }, 250);
   }
 
   render() {

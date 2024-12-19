@@ -50,14 +50,6 @@ const Root = styled('div')(({theme}) => ({
   '& .Form-optionIcon': {
     ...theme.mixins.nodeIcon,
   },
-  // '& .Form-label': {
-  //   margin: theme.spacing(0.75, 0.75, 0.75, 0.75),
-  //   display: 'flex',
-  //   wordBreak: 'break-word'
-  // },
-  // '& .Form-labelError': {
-  //   color: theme.palette.error.main,
-  // },
   '& .Form-sql': {
     border: '1px solid ' + theme.otherVars.inputBorderColor,
     borderRadius: theme.shape.borderRadius,
@@ -77,8 +69,9 @@ const Root = styled('div')(({theme}) => ({
   },
   '& .Form-noteRoot': {
     display: 'flex',
-    backgroundColor: theme.otherVars.borderColor,
+    backgroundColor: theme.otherVars.noteBg,
     padding: theme.spacing(1),
+    border: `1px solid ${theme.otherVars.borderColor}`
   },
   '& .Form-plainstring': {
     padding: theme.spacing(0.5),
@@ -189,9 +182,10 @@ FormInput.propTypes = {
   labelTooltip: PropTypes.string
 };
 
-export function InputSQL({ value, options, onChange, className, controlProps, inputRef, ...props }) {
+export function InputSQL({ value, options={}, onChange, className, controlProps, inputRef, ...props }) {
 
   const editor = useRef();
+  const { autocompleteProvider, autocompleteOnKeyPress } = options;
 
   return (
     <Root style={{height: '100%'}}>
@@ -199,13 +193,18 @@ export function InputSQL({ value, options, onChange, className, controlProps, in
         currEditor={(obj) => {
           editor.current = obj;
           inputRef?.(obj);
+          if(autocompleteProvider) {
+            editor.current.registerAutocomplete(autocompleteProvider);
+          }
         }}
         value={value || ''}
         options={{
-          ...options,
+          ..._.omit(options, ['autocompleteProvider', 'autocompleteOnKeyPress']),
         }}
         className={'Form-sql ' + className}
         onChange={onChange}
+        autocomplete={true}
+        autocompleteOnKeyPress={autocompleteOnKeyPress}
         {...controlProps}
         {...props}
       />
@@ -261,15 +260,17 @@ export function InputDateTimePicker({ value, onChange, readonly, controlProps, .
   let placeholder = '';
   let regExp = /[a-zA-Z]/;
   let timeZoneString = '';
+
+  controlProps = controlProps ?? {};
   if (controlProps?.pickerType === 'Date') {
-    format = controlProps.format || DATE_TIME_FORMAT.DATE;
+    format = controlProps?.format || DATE_TIME_FORMAT.DATE;
     placeholder = controlProps.placeholder || 'YYYY-MM-DD';
   } else if (controlProps?.pickerType === 'Time') {
-    format = controlProps.format || (controlProps.ampm ? DATE_TIME_FORMAT.TIME_12 : DATE_TIME_FORMAT.TIME_24);
-    placeholder = controlProps.placeholder || 'HH:mm:ss';
+    format = controlProps?.format || (controlProps?.ampm ? DATE_TIME_FORMAT.TIME_12 : DATE_TIME_FORMAT.TIME_24);
+    placeholder = controlProps?.placeholder || 'HH:mm:ss';
   } else {
-    format = controlProps.format || (controlProps.ampm ? DATE_TIME_FORMAT.DATE_TIME_12 : DATE_TIME_FORMAT.DATE_TIME_24);
-    placeholder = controlProps.placeholder || 'YYYY-MM-DD HH:mm:ss Z';
+    format = controlProps?.format || (controlProps?.ampm ? DATE_TIME_FORMAT.DATE_TIME_12 : DATE_TIME_FORMAT.DATE_TIME_24);
+    placeholder = controlProps?.placeholder || 'YYYY-MM-DD HH:mm:ss Z';
   }
 
   const handleChange = (dateVal) => {
@@ -572,7 +573,7 @@ FormInputSwitch.propTypes = {
   labelTooltip: PropTypes.string
 };
 
-export function InputCheckbox({ cid, helpid, value, onChange, controlProps, readonly, labelPlacement, ...props }) {
+export function InputCheckbox({ cid, helpid, value, onChange, controlProps, readonly, disabled, labelPlacement, ...props }) {
   controlProps = controlProps || {};
   return (
     <FormControlLabel
@@ -585,6 +586,7 @@ export function InputCheckbox({ cid, helpid, value, onChange, controlProps, read
           inputProps={{ 'aria-describedby': helpid, 'title': controlProps.label}}
           {...props} />
       }
+      disabled={disabled}
       label={controlProps.label}
       labelPlacement={labelPlacement}
     />
@@ -597,6 +599,7 @@ InputCheckbox.propTypes = {
   controlProps: PropTypes.object,
   onChange: PropTypes.func,
   readonly: PropTypes.bool,
+  disabled: PropTypes.bool,
   labelPlacement: PropTypes.string
 };
 
@@ -619,14 +622,14 @@ FormInputCheckbox.propTypes = {
   labelTooltip: PropTypes.string
 };
 
-export function InputRadio({ helpid, value, onChange, controlProps, readonly, labelPlacement, ...props }) {
+export function InputRadio({ helpid, value, onChange, controlProps, readonly, labelPlacement, disabled }) {
   controlProps = controlProps || {};
   return (
     <FormControlLabel
       control={
         <Radio
           color="primary"
-          checked={props?.disabled ? false : value }
+          checked={value}
           onChange={
             readonly ? () => {
               /*This is intentional (SonarQube)*/ } : onChange
@@ -634,13 +637,12 @@ export function InputRadio({ helpid, value, onChange, controlProps, readonly, la
           value={value}
           name="radio-button-demo"
           inputProps={{ 'aria-label': value, 'aria-describedby': helpid }}
-          style={{ padding: 0 }}
           disableRipple
         />
       }
+      disabled={disabled}
       label={controlProps.label}
       labelPlacement={labelPlacement}
-      className={(readonly || props.disabled) ? 'Form-readOnlySwitch' : null}
     />
   );
 }

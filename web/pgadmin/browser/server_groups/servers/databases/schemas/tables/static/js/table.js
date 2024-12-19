@@ -119,12 +119,12 @@ define('pgadmin.node.table', [
         },{
           name: 'count_table_rows', node: 'table', module: this,
           applies: ['object', 'context'], callback: 'count_table_rows',
-          category: 'Count', priority: 2, label: gettext('Count Rows'),
+          priority: 2, label: gettext('Count Rows'),
           enable: true,
         },{
           name: 'generate_erd', node: 'table', module: this,
           applies: ['object', 'context'], callback: 'generate_erd',
-          category: 'erd', priority: 5, label: gettext('ERD For Table'),
+          priority: 5, label: gettext('ERD For Table'),
           enable: (_, item) => {
             return !('catalog' in pgAdmin.Browser.tree.getTreeNodeHierarchy(item));
           }
@@ -398,6 +398,9 @@ define('pgadmin.node.table', [
           }
           insertChildrenNodes();
         }
+
+        let selectedTable = pgBrowser.tree.selected();
+        pgBrowser.tree.refresh(selectedTable);
       },
       handle_cache: function() {
         // Clear Table's cache as column's type is dependent on two node

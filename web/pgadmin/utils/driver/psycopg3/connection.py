@@ -233,7 +233,10 @@ class Connection(BaseConnection):
             kwargs.pop('password')
             is_update_password = False
         else:
-            encpass = kwargs['password'] if 'password' in kwargs else None
+            if 'encpass' in kwargs:
+                encpass = kwargs['encpass']
+            else:
+                encpass = kwargs['password'] if 'password' in kwargs else None
 
         return password, encpass, is_update_password
 
@@ -1302,6 +1305,11 @@ WHERE db.datname = current_database()""")
         rows = []
         self.row_count = cur.rowcount
 
+        # If multiple queries are run, make sure to reach
+        # the last query result
+        while cur.nextset():
+            pass  # This loop is empty
+
         if cur.get_rowcount() > 0:
             rows = cur.fetchall()
 
@@ -1502,7 +1510,8 @@ Failed to reset the connection to the server due to following error:
                         for col in self.column_info:
                             col['pos'] = pos
                             pos += 1
-
+                else:
+                    self.column_info = None
                 self.row_count = cur.get_rowcount()
                 if not no_result and cur.get_rowcount() > 0:
                     result = []

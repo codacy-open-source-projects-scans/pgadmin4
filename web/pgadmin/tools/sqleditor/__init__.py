@@ -62,6 +62,9 @@ from pgadmin.settings import get_setting
 from pgadmin.utils.preferences import Preferences
 from pgadmin.tools.sqleditor.utils.apply_explain_plan_wrapper import \
     get_explain_query_length
+from pgadmin.browser.server_groups.servers.utils import \
+    convert_connection_parameter
+from pgadmin.misc.workspaces import check_and_delete_adhoc_server
 
 MODULE_NAME = 'sqleditor'
 TRANSACTION_STATUS_CHECK_FAILED = gettext("Transaction status check failed.")
@@ -341,6 +344,11 @@ def panel(trans_id):
 
 @blueprint.route(
     '/initialize/sqleditor/<int:trans_id>/<int:sgid>/<int:sid>/'
+    '<did>',
+    methods=["POST"], endpoint='initialize_sqleditor_with_did'
+)
+@blueprint.route(
+    '/initialize/sqleditor/<int:trans_id>/<int:sgid>/<int:sid>/'
     '<int:did>',
     methods=["POST"], endpoint='initialize_sqleditor_with_did'
 )
@@ -406,10 +414,11 @@ def _connect(conn, **kwargs):
         user = kwargs['user']
         role = kwargs['role'] if kwargs['role'] else None
         password = kwargs['password'] if kwargs['password'] else None
+        encpass = kwargs['encpass'] if kwargs['encpass'] else None
         is_ask_password = True
     if user:
         status, msg = conn.connect(user=user, role=role,
-                                   password=password)
+                                   password=password, encpass=encpass)
     else:
         status, msg = conn.connect(**kwargs)
 
@@ -424,8 +433,13 @@ def _init_sqleditor(trans_id, connect, sgid, sid, did, dbname=None, **kwargs):
         kwargs.pop('conn_id')
 
     conn_id_ac = str(secrets.choice(range(1, 9999999)))
-
+    server = Server.query.filter_by(id=sid).first()
     manager = get_driver(PG_DEFAULT_DRIVER).connection_manager(sid)
+
+    if kwargs.get('password', None) is None:
+        kwargs['encpass'] = server.password
+    else:
+        kwargs['encpass'] = None
 
     if did is None:
         did = manager.did
@@ -459,7 +473,6 @@ def _init_sqleditor(trans_id, connect, sgid, sid, did, dbname=None, **kwargs):
             if not status:
                 current_app.logger.error(msg)
                 if is_ask_password:
-                    server = Server.query.filter_by(id=sid).first()
                     return True, make_json_response(
                         success=0,
                         status=428,
@@ -691,6 +704,9 @@ def close_sqleditor_session(trans_id):
                 if conn.connected():
                     conn.cancel_transaction(cmd_obj.conn_id, cmd_obj.did)
                     manager.release(did=cmd_obj.did, conn_id=cmd_obj.conn_id)
+                    # Check if all the connections of the adhoc server is
+                    # closed then delete the server from the pgadmin database.
+                    check_and_delete_adhoc_server(cmd_obj.sid)
 
         # Close the auto complete connection
         if hasattr(cmd_obj, 'conn_id_ac') and cmd_obj.conn_id_ac is not None:
@@ -1129,7 +1145,7 @@ def poll(trans_id):
     pagination = {
         'page_size': page_size,
         'page_count': math.ceil(conn.total_rows / page_size),
-        'page_no': math.floor(rows_fetched_from / page_size) + 1,
+        'page_no': math.floor((rows_fetched_from - 1) / page_size) + 1,
         'rows_from': rows_fetched_from,
         'rows_to': rows_fetched_to
     }
@@ -1197,7 +1213,7 @@ def fetch_window(trans_id, from_rownum=0, to_rownum=0):
     pagination = {
         'page_size': page_size,
         'page_count': math.ceil(conn.total_rows / page_size),
-        'page_no': math.floor(rows_fetched_from / page_size) + 1,
+        'page_no': math.floor((rows_fetched_from - 1) / page_size) + 1,
         'rows_from': rows_fetched_from,
         'rows_to': rows_fetched_to
     }
@@ -1754,8 +1770,7 @@ def check_and_upgrade_to_qt(trans_id, connect):
 
     if 'gridData' in session and str(trans_id) in session['gridData']:
         data = pickle.loads(session['gridData'][str(trans_id)]['command_obj'])
-        if data.object_type == 'table' or data.object_type == 'view' or\
-                data.object_type == 'mview':
+        if data.object_type in ['table', 'foreign_table', 'view', 'mview']:
             manager = get_driver(PG_DEFAULT_DRIVER).connection_manager(
                 data.sid)
             default_conn = manager.connection(conn_id=data.conn_id,
@@ -2321,7 +2336,7 @@ def get_new_connection_data(sgid=None, sid=None):
         server_groups = ServerGroup.query.all()
         server_group_data = {server_group.name: [] for server_group in
                              server_groups}
-        servers = Server.query.all()
+        servers = Server.query.filter(Server.is_adhoc == 0)
 
         for server in servers:
             manager = driver.connection_manager(server.id)
@@ -2334,6 +2349,11 @@ def get_new_connection_data(sgid=None, sid=None):
                                                     server),
                 'fgcolor': server.fgcolor,
                 'bgcolor': server.bgcolor,
+                'host': server.host,
+                'port': server.port,
+                'service': server.service,
+                'connection_params':
+                    convert_connection_parameter(server.connection_params),
                 'connected': connected})
 
         msg = "Success"

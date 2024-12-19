@@ -83,7 +83,8 @@ class ServerManager(object):
         self.db_res = server.db_res
         self.name = server.name
         self.passexec = \
-            PasswordExec(server.passexec_cmd, server.passexec_expiration) \
+            PasswordExec(server.passexec_cmd, server.host, server.port,
+                         server.username, server.passexec_expiration) \
             if server.passexec_cmd else None
         self.service = server.service
 
@@ -242,7 +243,8 @@ WHERE db.oid = {0}""".format(did))
                                 "Could not find the specified database."
                             ))
 
-        if not get_crypt_key()[0]:
+        if not get_crypt_key()[0] and (
+                config.SERVER_MODE or not config.USE_OS_SECRET_STORAGE):
             # the reason its not connected might be missing key
             raise CryptKeyMissing()
 
@@ -671,12 +673,10 @@ WHERE db.oid = {0}""".format(did))
                 orig_value = value
                 # Getting complete file path if the key is one of the below.
                 if key in ['passfile', 'sslcert', 'sslkey','sslcrl',
-                           'sslcrldir']:
+                           'sslcrldir'] or \
+                        (key == 'sslrootcert' and value != 'system'):
                     with_complete_path = True
                     value = get_complete_file_path(value)
-
-                if key == 'sslrootcert' and value != 'system':
-                    dsn_args[key] = get_complete_file_path(value)
 
                 # If key is hostaddr and ssh tunnel is in use don't overwrite.
                 if key == 'hostaddr' and self.use_ssh_tunnel:

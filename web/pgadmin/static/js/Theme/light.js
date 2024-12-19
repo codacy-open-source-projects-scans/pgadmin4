@@ -42,6 +42,8 @@ export default function(basicSettings) {
         main: '#CC0000',
         light: '#FAECEC',
         contrastText: '#fff',
+        hoverMain: darken('#CC0000', 0.25),
+        hoverBorderColor: darken('#CC0000', 0.25),
       },
       warning: {
         main: '#eea236',
@@ -114,6 +116,7 @@ export default function(basicSettings) {
       textMuted: '#646B82',
       erdCanvasBg: '#fff',
       erdGridColor: '#bac1cd',
+      noteBg: '#dde0e6',
       explain: {
         sev2: {
           color: '#222222',

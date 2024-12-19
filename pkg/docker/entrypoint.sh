@@ -36,12 +36,14 @@ if [ -n "${PGADMIN_CONFIG_CONFIG_DATABASE_URI_FILE}" ]; then
 fi
 file_env PGADMIN_DEFAULT_PASSWORD
 
+# TO enable custom path for config_distro, pass config distro path via environment variable.
+export CONFIG_DISTRO_FILE_PATH="${PGADMIN_CUSTOM_CONFIG_DISTRO_FILE:-/pgadmin4/config_distro.py}"
 # Populate config_distro.py. This has some default config, as well as anything
 # provided by the user through the PGADMIN_CONFIG_* environment variables.
-# Only update the file on first launch. The empty file is created during the
+# Only update the file on first launch. The empty file is created only in default path during the
 # container build so it can have the required ownership.
-if [ "$(wc -m /pgadmin4/config_distro.py | awk '{ print $1 }')" = "0" ]; then
-    cat << EOF > /pgadmin4/config_distro.py
+if [ ! -e "${CONFIG_DISTRO_FILE_PATH}" ] || [ "$(wc -m "${CONFIG_DISTRO_FILE_PATH}" 2>/dev/null | awk '{ print $1 }')" = "0" ]; then
+    cat << EOF > "${CONFIG_DISTRO_FILE_PATH}"
 CA_FILE = '/etc/ssl/certs/ca-certificates.crt'
 LOG_FILE = '/dev/null'
 HELP_PATH = '../../docs'
@@ -51,8 +53,7 @@ DEFAULT_BINARY_PATHS = {
         'pg-16': '/usr/local/pgsql-16',
         'pg-15': '/usr/local/pgsql-15',
         'pg-14': '/usr/local/pgsql-14',
-        'pg-13': '/usr/local/pgsql-13',
-        'pg-12': '/usr/local/pgsql-12'
+        'pg-13': '/usr/local/pgsql-13'
 }
 EOF
 
@@ -61,7 +62,7 @@ EOF
     for var in $(env | grep "^PGADMIN_CONFIG_" | cut -d "=" -f 1); do
         # shellcheck disable=SC2086
         # shellcheck disable=SC2046
-        echo ${var#PGADMIN_CONFIG_} = $(eval "echo \$$var") >> /pgadmin4/config_distro.py
+        echo ${var#PGADMIN_CONFIG_} = $(eval "echo \$$var") >> "${CONFIG_DISTRO_FILE_PATH}"
     done
 fi
 
@@ -118,14 +119,25 @@ if [ ! -f /var/lib/pgadmin/pgadmin4.db ] && [ "${external_config_db_exists}" = "
             /venv/bin/python3 /pgadmin4/setup.py load-servers "${PGADMIN_SERVER_JSON_FILE}" --user "${PGADMIN_DEFAULT_EMAIL}"
         fi
     fi
+    # Pre-load any required preferences
     if [ -f "${PGADMIN_PREFERENCES_JSON_FILE}" ]; then
-        # When running in Desktop mode, no user is created
-        # so we have to import servers anonymously
         if [ "${PGADMIN_CONFIG_SERVER_MODE}" = "False" ]; then
             DESKTOP_USER=$(cd /pgadmin4 && /venv/bin/python3 -c 'import config; print(config.DESKTOP_USER)')
             /venv/bin/python3 /pgadmin4/setup.py set-prefs "${DESKTOP_USER}" --input-file "${PGADMIN_PREFERENCES_JSON_FILE}"
         else
             /venv/bin/python3 /pgadmin4/setup.py set-prefs "${PGADMIN_DEFAULT_EMAIL}" --input-file "${PGADMIN_PREFERENCES_JSON_FILE}"
+        fi
+    fi
+    # Copy the pgpass file passed using secrets
+    if [ -f "${PGPASS_FILE}" ]; then
+        if [ "${PGADMIN_CONFIG_SERVER_MODE}" = "False" ]; then
+            cp ${PGPASS_FILE} /var/lib/pgadmin/.pgpass
+            chmod 600 /var/lib/pgadmin/.pgpass
+        else
+            PGADMIN_USER_CONFIG_DIR=$(echo "${PGADMIN_DEFAULT_EMAIL}" | sed 's/@/_/g')
+            mkdir -p /var/lib/pgadmin/storage/${PGADMIN_USER_CONFIG_DIR}
+            cp ${PGPASS_FILE} /var/lib/pgadmin/storage/${PGADMIN_USER_CONFIG_DIR}/.pgpass
+            chmod 600 /var/lib/pgadmin/storage/${PGADMIN_USER_CONFIG_DIR}/.pgpass
         fi
     fi
 

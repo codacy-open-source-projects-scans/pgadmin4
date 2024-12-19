@@ -110,9 +110,16 @@ define('pgadmin.node.database', [
             data_disabled: gettext('Selected database is already disconnected.'),
           },
         },{
+          name: 'disconnect_all_databases', node: 'coll-database', module: this,
+          applies: ['object', 'context'], callback: 'disconnect_all_databases',
+          category: 'disconnect', priority: 5, label: gettext('Disconnect from all databases'),
+          enable: 'can_disconnect',data: {
+            data_disabled: gettext('All the databases are already disconnected.'),
+          },
+        },{
           name: 'generate_erd', node: 'database', module: this,
           applies: ['object', 'context'], callback: 'generate_erd',
-          category: 'erd', priority: 5, label: gettext('ERD For Database'),
+          priority: 5, label: gettext('ERD For Database'),
           enable: (node) => {
             return node.allowConn;
           }
@@ -207,6 +214,14 @@ define('pgadmin.node.database', [
           }
         }
       },
+      can_disconnect: function(node, item) {
+        return _.some(item.children, (child) => {
+          let data = pgAdmin.Browser.tree.getData(child),
+            {connected, canDisconn} = data;
+          return connected && canDisconn;
+        }
+        );
+      },
       callbacks: {
         /* Connect the database */
         connect_database: function(args){
@@ -230,45 +245,33 @@ define('pgadmin.node.database', [
             d = i  ? t.itemData(i) : undefined;
 
           if (d) {
+            disconnect_from_database(obj, d, t, i, true);
+          }
+
+          return false;
+        },
+
+        disconnect_all_databases: function(args, item) {
+          let children = item.children ?? [],
+            obj = this,
+            t = pgBrowser.tree;
+
+          if (children) {
             pgAdmin.Browser.notifier.confirm(
-              gettext('Disconnect from database'),
-              gettext('Are you sure you want to disconnect from database - %s?', d.label),
+              gettext('Disconnect from all databases'),
+              gettext('Are you sure you want to disconnect from all databases?'),
               function() {
-                let data = d;
-                getApiInstance().delete(
-                  obj.generate_url(i, 'connect', d, true),
-                ).then(({data: res})=> {
-                  if (res.success == 1) {
-                    let prv_i = t.parent(i);
-                    if(res.data.info_prefix) {
-                      res.info = `${_.escape(res.data.info_prefix)} - ${res.info}`;
-                    }
-                    pgAdmin.Browser.notifier.success(res.info);
-                    t.removeIcon(i);
-                    data.connected = false;
-                    data.icon = data.isTemplate ? 'icon-database-template-not-connected':'icon-database-not-connected';
-
-                    t.addIcon(i, {icon: data.icon});
-                    t.unload(i);
-                    pgBrowser.Events.trigger('pgadmin:browser:tree:update-tree-state', i);
-                    setTimeout(function() {
-                      t.select(prv_i);
-                    }, 10);
-
-                  } else {
-                    try {
-                      pgAdmin.Browser.notifier.error(res.errormsg);
-                    } catch (e) {
-                      console.warn(e.stack || e);
-                    }
-                    t.unload(i);
+                _.forEach(children, function(child) {
+                  let data = pgAdmin.Browser.tree.getData(child);
+                  if (data.connected && data.canDisconn) {
+                    disconnect_from_database(obj, data, t, child, false);
                   }
-                }).catch(function(error) {
-                  pgAdmin.Browser.notifier.pgRespErrorNotify(error);
-                  t.unload(i);
                 });
+                t.deselect(item);
               },
-              function() { return true; }
+              function() { return true;},
+              gettext('Disconnect'),
+              gettext('Cancel')
             );
           }
 
@@ -335,6 +338,10 @@ define('pgadmin.node.database', [
           cacheLevel: 'server',
         });
 
+        let builtin_locale = ()=>getNodeAjaxOptions('get_builtin_locale', this, treeNodeInfo, itemNodeData, {
+          cacheLevel: 'server',
+        });
+
         return new DatabaseSchema(
           ()=>getNodeVariableSchema(this, treeNodeInfo, itemNodeData, false, true),
           (privileges)=>getNodePrivilegeRoleSchema(this, treeNodeInfo, itemNodeData, privileges),
@@ -364,7 +371,9 @@ define('pgadmin.node.database', [
             datcollate: c_types,
             datctype: c_types,
             daticulocale: icu_locale,
+            datbuiltinlocale: builtin_locale
           },
+          treeNodeInfo,
           {
             datowner: pgBrowser.serverInfo[treeNodeInfo.server._id].user.name,
           }
@@ -502,6 +511,65 @@ define('pgadmin.node.database', [
               error, obj, data, tree, item, wasConnected
             );
           });
+      },
+      disconnect_from_database = function(obj, data, tree, item, notify=false) {
+        let d = data,
+          t = tree,
+          i = item,
+          label = data.label;
+        let disconnect = function() {
+          d.label = `<span class='text-muted'>[Disconnecting...]</span> ${label}`;
+          t.setLabel(i,{label:d.label});
+          t.close(i);
+          let data = d;
+          getApiInstance().delete(
+            obj.generate_url(i, 'connect', d, true),
+          ).then(({data: res})=> {
+            if (res.success == 1) {
+              let prv_i = t.parent(i);
+              if(res.data.info_prefix) {
+                res.info = `${_.escape(res.data.info_prefix)} - ${res.info}`;
+              }
+              pgAdmin.Browser.notifier.success(res.info);
+              t.removeIcon(i);
+              data.connected = false;
+              data.icon = data.isTemplate ? 'icon-database-template-not-connected':'icon-database-not-connected';
+              d.label = label;
+              t.setLabel(i, {label});
+              t.addIcon(i, {icon: data.icon});
+              t.unload(i);
+              pgBrowser.Events.trigger('pgadmin:browser:tree:update-tree-state', i);
+              setTimeout(function() {
+                t.select(prv_i);
+              }, 10);
+
+            } else {
+              try {
+                pgAdmin.Browser.notifier.error(res.errormsg);
+              } catch (e) {
+                console.warn(e.stack || e);
+              }
+              t.unload(i);
+            }
+          }).catch(function(error) {
+            pgAdmin.Browser.notifier.pgRespErrorNotify(error);
+            t.unload(i);
+          });
+        };
+        if (notify) {
+          pgAdmin.Browser.notifier.confirm(
+            gettext('Disconnect from database'),
+            gettext('Are you sure you want to disconnect from the database - <b>%s</b>?', d.label),
+            function() {
+              disconnect();
+            },
+            function() { return true; },
+            gettext('Disconnect'),
+            gettext('Cancel')
+          );
+        } else {
+          disconnect();
+        }
       };
   }
 

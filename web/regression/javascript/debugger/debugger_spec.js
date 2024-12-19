@@ -22,6 +22,7 @@ import DebuggerComponent from '../../../pgadmin/tools/debugger/static/js/compone
 import FunctionArguments from '../../../pgadmin/tools/debugger/static/js/debugger_ui';
 import Debugger from '../../../pgadmin/tools/debugger/static/js/DebuggerModule';
 import Theme from '../../../pgadmin/static/js/Theme';
+import { PgAdminProvider } from '../../../pgadmin/static/js/PgAdminProvider';
 
 
 describe('Debugger Component', () => {
@@ -58,13 +59,15 @@ describe('Debugger Component', () => {
     await act(async () => {
       render(
         <Theme>
-          <DebuggerComponent
-            pgAdmin={pgAdmin}
-            panel={document.getElementById('debugger-main-container')}
-            selectedNodeInfo={nodeInfo}
-            layout={''}
-            params={params}
-          />
+          <PgAdminProvider value={pgAdmin}>
+            <DebuggerComponent
+              pgAdmin={pgAdmin}
+              panel={document.getElementById('debugger-main-container')}
+              selectedNodeInfo={nodeInfo}
+              layout={''}
+              params={params}
+            />
+          </PgAdminProvider>
         </Theme>
       );
     });

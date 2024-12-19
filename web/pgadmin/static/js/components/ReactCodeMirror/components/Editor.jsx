@@ -104,7 +104,14 @@ function handlePaste(e) {
 function insertTabWithUnit({ state, dispatch }) {
   if (state.selection.ranges.some(r => !r.empty))
     return indentMore({ state, dispatch });
-  dispatch(state.update(state.replaceSelection(state.facet(indentUnit)), { scrollIntoView: true, userEvent: 'input' }));
+
+  // If indent is space based, then calc the number of spaces required.
+  let indentVal = state.facet(indentUnit);
+  if(indentVal != '\t') {
+    const line = state.doc.lineAt(state.selection.main.head);
+    indentVal =  ' '.repeat(indentVal.length - (state.selection.main.head - line.from) % indentVal.length);
+  }
+  dispatch(state.update(state.replaceSelection(indentVal), { scrollIntoView: true, userEvent: 'input' }));
   return true;
 }
 
@@ -120,12 +127,12 @@ const defaultExtensions = [
   syntaxHighlighting,
   keymap.of([{
     key: 'Tab',
+    run: acceptCompletion,
+  },{
+    key: 'Tab',
     preventDefault: true,
     run: insertTabWithUnit,
     shift: indentLess,
-  },{
-    key: 'Tab',
-    run: acceptCompletion,
   },{
     key: 'Backspace',
     preventDefault: true,
@@ -158,7 +165,7 @@ const defaultExtensions = [
 
 export default function Editor({
   currEditor, name, value, options, onCursorActivity, onChange, readonly,
-  disabled, autocomplete = false, breakpoint = false, onBreakPointChange,
+  disabled, autocomplete = false, autocompleteOnKeyPress, breakpoint = false, onBreakPointChange,
   showActiveLine=false, keepHistory = true, cid, helpid, labelledBy,
   customKeyMap, language='pgsql'
 }) {
@@ -181,7 +188,7 @@ export default function Editor({
   useEffect(() => {
     if (!checkIsMounted()) return;
     const finalOptions = { ...defaultOptions, ...options };
-    const osEOL = OS_EOL === 'crlf' ? '\r\n' : '\n'; 
+    const osEOL = OS_EOL === 'crlf' ? '\r\n' : '\n';
     const finalExtns = [
       (language == 'json') ? json() : sql({dialect: PgSQL}),
       ...defaultExtensions,
@@ -324,7 +331,7 @@ export default function Editor({
       }],
     };
     if (autocomplete) {
-      if (pref.autocomplete_on_key_press) {
+      if (pref.autocomplete_on_key_press || autocompleteOnKeyPress) {
         newConfigExtn.push(autocompletion({
           ...autoCompOptions,
           activateOnTyping: true,

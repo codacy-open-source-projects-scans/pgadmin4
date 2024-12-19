@@ -1,3 +1,12 @@
+/////////////////////////////////////////////////////////////
+//
+// pgAdmin 4 - PostgreSQL Tools
+//
+// Copyright (C) 2013 - 2024, The pgAdmin Development Team
+// This software is released under the PostgreSQL Licence
+//
+//////////////////////////////////////////////////////////////
+
 import React, { useRef } from 'react';
 import CheckIcon from '@mui/icons-material/Check';
 import PropTypes from 'prop-types';
@@ -5,7 +14,6 @@ import PropTypes from 'prop-types';
 import {
   MenuItem,
   ControlledMenu,
-  applyStatics,
   Menu,
   SubMenu,
 } from '@szhsin/react-menu';
@@ -48,13 +56,17 @@ PgMenu.propTypes = {
   menuButton: PropTypes.element,
 };
 
-export const PgSubMenu = applyStatics(SubMenu)(({label, ...props})=>{
+export const PgSubMenu = (({label, ...props})=>{
   return (
     <SubMenu label={label}  itemProps={{'data-label': label}} {...props} />
   );
 });
 
-export const PgMenuItem = applyStatics(MenuItem)(({hasCheck=false, checked=false, accesskey, shortcut, children, closeOnCheck=false, ...props})=>{
+PgSubMenu.propTypes = {
+  label: PropTypes.string
+};
+
+export const PgMenuItem = (({hasCheck=false, checked=false, accesskey, shortcut, children, closeOnCheck=false, ...props})=>{
 
   let onClick = props.onClick;
   if(hasCheck) {
@@ -83,7 +95,7 @@ PgMenuItem.propTypes = {
   children: CustomPropTypes.children,
   closeOnCheck: PropTypes.bool,
   onClick: PropTypes.func,
-  dataLabel: PropTypes.string,
+  datalabel: PropTypes.string,
 };
 
 export function usePgMenuGroup() {

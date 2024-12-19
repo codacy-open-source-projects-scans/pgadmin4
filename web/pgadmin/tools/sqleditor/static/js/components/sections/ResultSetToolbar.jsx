@@ -35,7 +35,7 @@ import PropTypes from 'prop-types';
 import CodeMirror from '../../../../../../static/js/components/ReactCodeMirror';
 import { setEditorPosition } from '../QueryToolDataGrid/Editors';
 import { InputText } from '../../../../../../static/js/components/FormComponents';
-import { minMaxValidator } from '../../../../../../static/js/validators';
+import { isEmptyString, minMaxValidator } from '../../../../../../static/js/validators';
 
 const StyledDiv = styled('div')(({theme})=>({
   padding: '2px',
@@ -111,6 +111,7 @@ function PaginationInputs({pagination, totalRowCount, clearSelection}) {
     from: pagination.rows_from ?? 0,
     to: pagination.rows_to ?? 0,
     pageNo: pagination.page_no ?? 0,
+    pageCount: pagination.page_count ?? 0,
   });
 
   const goToPage = (pageNo)=>{
@@ -139,21 +140,30 @@ function PaginationInputs({pagination, totalRowCount, clearSelection}) {
   };
 
   useEffect(()=>{
+    setInputs({
+      from: pagination.rows_from ?? 0,
+      to: pagination.rows_to ?? 0,
+      pageNo: pagination.page_no ?? 0,
+      pageCount: pagination.page_count ?? 0,
+    });
+  }, [pagination, editPageRange]);
+
+  useEffect(()=>{
     // validate
     setErrorInputs((prev)=>{
       let errors = {...prev};
 
-      if(minMaxValidator('', inputs.pageNo, 1, pagination.page_count)) {
+      if(minMaxValidator('', parseInt(inputs.pageNo), 1, parseInt(inputs.pageCount)) || isEmptyString(inputs.pageNo)) {
         errors.pageNo = true;
       } else {
         errors.pageNo = false;
       }
-      if(minMaxValidator('', inputs.from, 1, inputs.to)) {
+      if(minMaxValidator('', parseInt(inputs.from), 1, parseInt(inputs.to)) || isEmptyString(inputs.from)) {
         errors.from = true;
       } else {
         errors.from = false;
       }
-      if(minMaxValidator('', inputs.to, 1, totalRowCount)) {
+      if(minMaxValidator('', parseInt(inputs.to), 1, totalRowCount) || isEmptyString(inputs.to)) {
         errors.to = true;
       } else {
         errors.to = false;
@@ -161,14 +171,16 @@ function PaginationInputs({pagination, totalRowCount, clearSelection}) {
 
       return errors;
     });
-  }, [inputs, pagination]);
+  }, [inputs]);
 
   return (
     <Box className='PaginationInputs'>
       {editPageRange ?
         <Box display="flex" gap="2px" alignItems="center">
           <div>{gettext('Showing rows:')}</div>
-          <InputText size="small"
+          <InputText
+            type="int"
+            size="small"
             controlProps={{maxLength: 7}}
             style={{
               maxWidth: '10ch'
@@ -179,7 +191,9 @@ function PaginationInputs({pagination, totalRowCount, clearSelection}) {
             error={errorInputs['from']}
           />
           <div>{gettext('to')}</div>
-          <InputText size="small"
+          <InputText
+            type="int"
+            size="small"
             controlProps={{maxLength: 7}}
             style={{
               maxWidth: '10ch'
@@ -194,7 +208,7 @@ function PaginationInputs({pagination, totalRowCount, clearSelection}) {
         {editPageRange && <PgIconButton size="xs"
           title={editPageRange ? gettext('Apply (or press Enter on input)') : gettext('Edit range')}
           onClick={()=>eventBus.fireEvent(QUERY_TOOL_EVENTS.FETCH_WINDOW, inputs.from, inputs.to)}
-          icon={<CheckRoundedIcon />}
+          disabled={errorInputs.from || errorInputs.to} icon={<CheckRoundedIcon />}
         />}
         <PgIconButton size="xs"
           title={editPageRange ? gettext('Cancel edit') : gettext('Edit range')}
@@ -204,7 +218,9 @@ function PaginationInputs({pagination, totalRowCount, clearSelection}) {
       </PgButtonGroup>
       <div className='PaginationInputs-divider'>&nbsp;</div>
       <span>{gettext('Page No:')}</span>
-      <InputText size="small"
+      <InputText
+        type="int"
+        size="small"
         controlProps={{maxLength: 7}}
         style={{
           maxWidth: '10ch'
@@ -217,8 +233,8 @@ function PaginationInputs({pagination, totalRowCount, clearSelection}) {
       <span> {gettext('of')} {pagination.page_count}</span>
       <div className='PaginationInputs-divider'>&nbsp;</div>
       <PgButtonGroup size="small">
-        <PgIconButton title={gettext('First Page')} disabled={pagination.page_no == 1} onClick={()=>goToPage(1)} icon={<SkipPreviousRoundedIcon />}/>
-        <PgIconButton title={gettext('Previous Page')} disabled={pagination.page_no == 1} onClick={()=>goToPage(pagination.page_no-1)} icon={<FastRewindRoundedIcon />}/>
+        <PgIconButton title={gettext('First Page')} disabled={pagination.page_no <= 1} onClick={()=>goToPage(1)} icon={<SkipPreviousRoundedIcon />}/>
+        <PgIconButton title={gettext('Previous Page')} disabled={pagination.page_no <= 1} onClick={()=>goToPage(pagination.page_no-1)} icon={<FastRewindRoundedIcon />}/>
         <PgIconButton title={gettext('Next Page')} disabled={pagination.page_no == pagination.page_count} onClick={()=>goToPage(pagination.page_no+1)} icon={<FastForwardRoundedIcon />}/>
         <PgIconButton title={gettext('Last Page')} disabled={pagination.page_no == pagination.page_count} onClick={()=>goToPage(pagination.page_count)} icon={<SkipNextRoundedIcon />} />
       </PgButtonGroup>
@@ -407,7 +423,7 @@ export function ResultSetToolbar({query, canEdit, totalRowCount, pagination, all
           </>
           }
           {
-            allRowsSelect == 'PAGE' && (
+            allRowsSelect == 'PAGE' && totalRowCount > pagination.page_size && (
               <div>
                 <span>{gettext('All rows on this page are selected.')}</span>
                 <PgButtonGroup size="small">
@@ -427,9 +443,10 @@ export function ResultSetToolbar({query, canEdit, totalRowCount, pagination, all
             )
           }
         </Box>
+        {totalRowCount > 0 &&
         <Box>
           <PaginationInputs key={JSON.stringify(pagination)} pagination={pagination} totalRowCount={totalRowCount} clearSelection={clearSelection} />
-        </Box>
+        </Box>}
       </StyledDiv>
       <PgMenu
         anchorRef={copyMenuRef}

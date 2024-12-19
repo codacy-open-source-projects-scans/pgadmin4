@@ -28,7 +28,7 @@ import moment from 'moment';
 import ConfirmSaveContent from '../../../../../../static/js/Dialogs/ConfirmSaveContent';
 import EmptyPanelMessage from '../../../../../../static/js/components/EmptyPanelMessage';
 import { GraphVisualiser } from './GraphVisualiser';
-import { usePgAdmin } from '../../../../../../static/js/BrowserComponent';
+import { usePgAdmin } from '../../../../../../static/js/PgAdminProvider';
 import pgAdmin from 'sources/pgadmin';
 import ConnectServerContent from '../../../../../../static/js/Dialogs/ConnectServerContent';
 
@@ -300,7 +300,17 @@ export class ResultSetUtils {
         }, ()=>{
           /*This is intentional (SonarQube)*/
         });
-      } else {
+      }else if (e?.response?.data.info == 'CRYPTKEY_MISSING'){
+        let pgBrowser = window.pgAdmin.Browser;
+        pgBrowser.set_master_password('', async (passwordData)=>{
+          await this.connectServer(this.queryToolCtx.params.sid, this.queryToolCtx.params.user, passwordData, async ()=>{
+            await this.eventBus.fireEvent(QUERY_TOOL_EVENTS.REINIT_QT_CONNECTION, '', explainObject, macroSQL, flags.executeCursor, true);
+          });
+        }, ()=> {
+          /*This is intentional (SonarQube)*/
+        });
+        return;
+      }else {
         this.eventBus.fireEvent(QUERY_TOOL_EVENTS.EXECUTION_END);
         this.eventBus.fireEvent(QUERY_TOOL_EVENTS.HANDLE_API_ERROR,
           e,
@@ -675,15 +685,18 @@ export class ResultSetUtils {
       return retVal;
     }
     let copiedRowsObjects = [];
-    try {
-      /* If the raw row objects are available, use to them identify null values */
-      copiedRowsObjects = JSON.parse(localStorage.getItem('copied-rows'));
-    } catch {/* Suppress the error */}
+    if(fromClipboard) {
+      try {
+        /* If the raw row objects are available, use to them identify null values */
+        copiedRowsObjects = JSON.parse(localStorage.getItem('copied-rows'));
+      } catch {/* Suppress the error */}
+    }
     for(const [recIdx, rec] of result?.entries()??[]) {
       // Convert 2darray to dict.
       let rowObj = {};
       for(const col of columns) {
-        let columnVal = rec[col.pos];
+        // if column data is undefined and there is not default value then set it to null.
+        let columnVal = rec[col.pos] ?? (col.has_default_val ? undefined : null);
         /* If the source is clipboard, then it needs some extra handling */
         if(fromClipboard) {
           columnVal = this.processClipboardVal(columnVal, col, copiedRowsObjects[recIdx]?.[col.key], pasteSerials);
@@ -753,6 +766,8 @@ export class ResultSetUtils {
       }
       this.eventBus.fireEvent(QUERY_TOOL_EVENTS.SET_MESSAGE, tabMsg, true);
       this.eventBus.fireEvent(QUERY_TOOL_EVENTS.FOCUS_PANEL, PANELS.MESSAGES);
+      /* Clear the query data if the query has no result to display.*/
+      onResultsAvailable(null, [], []);
     }
     return retMsg;
   }
@@ -868,15 +883,19 @@ export function ResultSet() {
     eventBus.fireEvent(QUERY_TOOL_EVENTS.SELECTED_ROWS_COLS_CELL_CHANGED, selectedRows.size, selectedColumns.size, selectedRange.current, selectedCell.current?.length);
   };
 
+  const resetSelectionAndChanges = ()=>{
+    dispatchDataChange({type: 'reset'});
+    setSelectedRows(new Set());
+    setSelectedColumns(new Set());
+  };
+
   const executionStartCallback = async (query, {
     explainObject, macroSQL, external=false, reconnect=false, executeCursor=false, refreshData=false
   })=>{
     const yesCallback = async ()=>{
       /* Reset */
       eventBus.fireEvent(QUERY_TOOL_EVENTS.HIGHLIGHT_ERROR, null);
-      dispatchDataChange({type: 'reset'});
-      setSelectedRows(new Set());
-      setSelectedColumns(new Set());
+      resetSelectionAndChanges();
       rsu.current.resetClientPKIndex();
       setLoaderText(gettext('Waiting for the query to complete...'));
       setDataOutputQuery(query);
@@ -1032,6 +1051,7 @@ export function ResultSet() {
       } else {
         setAllRowsSelect('NONE');
       }
+      setSelectedColumns(new Set());
     });
 
     eventBus.registerListener(QUERY_TOOL_EVENTS.ALL_ROWS_SELECTED, ()=>{
@@ -1110,6 +1130,7 @@ export function ResultSet() {
         pageDataDirty.current = false;
         fetchWindow(...args);
       }
+      resetSelectionAndChanges();
     });
     return ()=>{
       deregFetch();
@@ -1234,9 +1255,7 @@ export function ResultSet() {
         });
         setColumns((prev)=>prev);
       }
-      dispatchDataChange({type: 'reset'});
-      setSelectedRows(new Set());
-      setSelectedColumns(new Set());
+      resetSelectionAndChanges();
       eventBus.fireEvent(QUERY_TOOL_EVENTS.SET_CONNECTION_STATUS, respData.data.transaction_status);
       eventBus.fireEvent(QUERY_TOOL_EVENTS.SET_MESSAGE, '');
       pgAdmin.Browser.notifier.success(gettext('Data saved successfully.'));
@@ -1530,6 +1549,7 @@ export function ResultSet() {
             onSelectedColumnsChange={setSelectedColumns}
             onSelectedCellChange={setSelectedCell}
             onSelectedRangeChange={setSelectedRange}
+            stripedRows={queryToolCtx.preferences?.sqleditor?.striped_rows}
           />
         </Box>
       </>}

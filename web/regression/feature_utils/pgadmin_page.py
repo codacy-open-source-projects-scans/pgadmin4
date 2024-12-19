@@ -354,7 +354,7 @@ class PgadminPage:
             self.click_element(self.find_by_css_selector(
                 "li[data-label='Remove Server']"))
             self.driver.switch_to.default_content()
-            self.click_modal('Yes')
+            self.click_modal('Delete')
             time.sleep(1)
         else:
             print(server_config['name'] + " server is not removed",
@@ -1253,7 +1253,8 @@ class PgadminPage:
                 WebDriverWait(self.driver, 10).until(
                     EC.visibility_of_element_located(verify_locator))
                 click_status = True
-            except Exception:
+            except Exception as e:
+                print(e)
                 attempt += 1
         return click_status
 
