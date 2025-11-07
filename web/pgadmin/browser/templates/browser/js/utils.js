@@ -2,7 +2,7 @@
 //
 // pgAdmin 4 - PostgreSQL Tools
 //
-// Copyright (C) 2013 - 2024, The pgAdmin Development Team
+// Copyright (C) 2013 - 2025, The pgAdmin Development Team
 // This software is released under the PostgreSQL Licence
 //
 //////////////////////////////////////////////////////////////
@@ -63,9 +63,6 @@ define('pgadmin.browser.utils',
 
   pgAdmin['fixed_binary_paths'] = {{ current_app.config.get('FIXED_BINARY_PATHS') }};
 
-  /* GET the pgadmin server's locale */
-  pgAdmin['pgadmin_server_locale'] =  '{{pgadmin_server_locale}}';
-
    /* Server Heartbeat Timeout */
   pgAdmin['heartbeat_timeout'] =  '{{heartbeat_timeout}}';
 
@@ -81,20 +78,13 @@ define('pgadmin.browser.utils',
      'coll-role', 'role', 'coll-resource_group', 'resource_group',
      'coll-database', 'coll-pga_job', 'coll-pga_schedule', 'coll-pga_jobstep',
      'pga_job', 'pga_schedule', 'pga_jobstep',
-     'coll-replica_node', 'replica_node'
+     'coll-replica_node', 'replica_node','coll-directory','directory'
   ];
 
   pgBrowser.utils = {
     layout: {{ layout|tojson }},
     theme: '{{ theme }}',
     pg_help_path: '{{ pg_help_path }}',
-    tabSize: '{{ editor_tab_size }}',
-    wrapCode: '{{ editor_wrap_code }}' == 'True',
-    useSpaces: '{{ editor_use_spaces }}',
-    insertPairBrackets: '{{ editor_insert_pair_brackets }}' == 'True',
-    braceMatching: '{{ editor_brace_matching }}' == 'True',
-    highlightSelectionMatches: '{{editor_highlight_selection_matches}}' == 'True',
-    is_indent_with_tabs: '{{ editor_indent_with_tabs }}' == 'True',
     app_name: '{{ app_name }}',
     app_version_int: '{{ app_version_int}}',
     pg_libpq_version: {{pg_libpq_version|e}},
@@ -156,10 +146,10 @@ define('pgadmin.browser.utils',
         {% endif %}
         {% if is_admin %}
         {
-          label: '{{ _('Users') }}',
+          label: '{{ _('User Management') }}',
           type: 'normal',
           callback: ()=>{
-            pgAdmin.UserManagement.show_users()
+            pgAdmin.UserManagement.launchUserManagement()
           }
         },
         {

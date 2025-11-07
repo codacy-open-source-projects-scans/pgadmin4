@@ -2,12 +2,11 @@
 //
 // pgAdmin 4 - PostgreSQL Tools
 //
-// Copyright (C) 2013 - 2024, The pgAdmin Development Team
+// Copyright (C) 2013 - 2025, The pgAdmin Development Team
 // This software is released under the PostgreSQL Licence
 //
 //////////////////////////////////////////////////////////////
 
-import React from 'react';
 import pgAdmin from 'sources/pgadmin';
 import ConnectServerContent from './ConnectServerContent';
 import url_for from 'sources/url_for';
@@ -67,7 +66,7 @@ export function showServerPassword() {
         }}
       />
     );
-  });
+  }, {id: 'id-connect-server'});
 }
 
 function masterPassCallbacks(masterpass_callback_queue) {
@@ -176,7 +175,7 @@ export function showMasterPassword(isPWDPresent, errmsg, masterpass_callback_que
           }}
         />
       );
-    });
+    }, {id: 'id-master-password'});
   }
 }
 
@@ -229,56 +228,53 @@ export function showChangeServerPassword() {
 }
 
 export function showChangeUserPassword(url) {
-  const panelId = BROWSER_PANELS.SEARCH_OBJECTS;
-  const onClose = ()=>{pgAdmin.Browser.docker.default_workspace.close(panelId);};
-  pgAdmin.Browser.docker.default_workspace.openDialog({
-    id: panelId,
-    title: gettext('Change pgAdmin User Password'),
-    content: (
-      <ChangePasswordContent
-        getInitData={()=>{
-          const api = getApiInstance();
-          return new Promise((resolve, reject)=>{
-            api.get(url)
-              .then((res)=>{
-                resolve(res.data);
-              })
-              .catch((err)=>{
-                reject(err instanceof Error ? err : Error(gettext('Something went wrong')));
-              });
-          });
-        }}
-        onClose={()=>{
-          onClose();
-        }}
-        onSave={(_isNew, data)=>{
-          const api = getApiInstance();
-          return new Promise((resolve, reject)=>{
-            const formData =  {
-              'password': data.password,
-              'new_password': data.newPassword,
-              'new_password_confirm': data.confirmPassword,
-              'csrf_token': data.csrf_token
-            };
-
-            api({
-              method: 'POST',
-              url: url,
-              data: formData,
-            }).then((res)=>{
-              resolve(res.data.info);
-              onClose();
-              pgAdmin.Browser.notifier.success(res.data.info);
-            }).catch((err)=>{
+  const title = gettext('Change pgAdmin User Password');
+  pgAdmin.Browser.notifier.showModal(title, (onClose) => {
+    return <ChangePasswordContent
+      getInitData={()=>{
+        const api = getApiInstance();
+        return new Promise((resolve, reject)=>{
+          api.get(url)
+            .then((res)=>{
+              resolve(res.data);
+            })
+            .catch((err)=>{
               reject(err instanceof Error ? err : Error(gettext('Something went wrong')));
             });
+        });
+      }}
+      onClose={()=>{
+        onClose();
+      }}
+      onSave={(_isNew, data)=>{
+        const api = getApiInstance();
+        return new Promise((resolve, reject)=>{
+          const formData =  {
+            'password': data.password,
+            'new_password': data.newPassword,
+            'new_password_confirm': data.confirmPassword,
+            'csrf_token': data.csrf_token
+          };
+
+          api({
+            method: 'POST',
+            url: url,
+            data: formData,
+          }).then((res)=>{
+            resolve(res.data.info);
+            onClose();
+            pgAdmin.Browser.notifier.success(res.data.info);
+          }).catch((err)=>{
+            reject(err instanceof Error ? err : Error(gettext('Something went wrong')));
           });
-        }}
-        hasCsrfToken={true}
-        showUser={false}
-      />
-    )
-  }, pgAdmin.Browser.stdW.md, pgAdmin.Browser.stdH.md);
+        });
+      }}
+      hasCsrfToken={true}
+      showUser={false}
+    />;
+  },
+  { isFullScreen: false, isResizeable: true, showFullScreen: false, isFullWidth: true,
+    dialogWidth: pgAdmin.Browser.stdW.md, dialogHeight: pgAdmin.Browser.stdH.md, id: 'id-change-password'});
 }
 
 export function showNamedRestorePoint() {
@@ -354,7 +350,7 @@ export function showChangeOwnership() {
     />;
   },
   { isFullScreen: false, isResizeable: true, showFullScreen: true, isFullWidth: true,
-    dialogWidth: pgAdmin.Browser.stdW.md, dialogHeight: pgAdmin.Browser.stdH.md});
+    dialogWidth: pgAdmin.Browser.stdW.md, dialogHeight: pgAdmin.Browser.stdH.md, id: 'id-change-owner' });
 }
 
 export function showUrlDialog() {
@@ -391,6 +387,6 @@ export function showQuickSearch() {
   pgAdmin.Browser.notifier.showModal(gettext('Quick Search'), (closeModal) => {
     return <QuickSearch closeModal={closeModal}/>;
   },
-  { isFullScreen: false, isResizeable: false, showFullScreen: false, isFullWidth: false, showTitle: false}
+  { isFullScreen: false, isResizeable: false, showFullScreen: false, isFullWidth: false, showTitle: false, id: 'id-quick-search'}
   );
 }

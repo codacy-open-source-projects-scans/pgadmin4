@@ -2,7 +2,7 @@
 //
 // pgAdmin 4 - PostgreSQL Tools
 //
-// Copyright (C) 2013 - 2024, The pgAdmin Development Team
+// Copyright (C) 2013 - 2025, The pgAdmin Development Team
 // This software is released under the PostgreSQL Licence
 //
 //////////////////////////////////////////////////////////////
@@ -15,7 +15,7 @@ export default class RowSecurityPolicySchema extends BaseUISchema {
   constructor(fieldOptions={}, initValues={}) {
     super({
       name: undefined,
-      policyowner: 'public',
+      policyowner: ['public'],
       event: 'ALL',
       using: undefined,
       using_orig: undefined,
@@ -106,7 +106,7 @@ export default class RowSecurityPolicySchema extends BaseUISchema {
         id: 'policyowner', label: gettext('Role'), cell: 'text',
         type: 'select',
         options: obj.fieldOptions.role,
-        controlProps: { allowClear: false }
+        controlProps: { multiple: true }
       },
       {
         id: 'type', label: gettext('Type'), type: 'select', deps:['type'],

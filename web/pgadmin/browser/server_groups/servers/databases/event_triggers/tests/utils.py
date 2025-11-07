@@ -2,7 +2,7 @@
 #
 # pgAdmin 4 - PostgreSQL Tools
 #
-# Copyright (C) 2013 - 2024, The pgAdmin Development Team
+# Copyright (C) 2013 - 2025, The pgAdmin Development Team
 # This software is released under the PostgreSQL Licence
 #
 ##########################################################################
@@ -50,8 +50,8 @@ def create_event_trigger(server, db_name, schema_name, func_name,
         set_isolation_level(connection, 0)
         pg_cursor = connection.cursor()
         pg_cursor.execute('''CREATE EVENT TRIGGER "%s" ON DDL_COMMAND_END
-         EXECUTE PROCEDURE "%s"."%s"()''' % (trigger_name, schema_name,
-                                             func_name))
+         EXECUTE FUNCTION "%s"."%s"()''' % (trigger_name, schema_name,
+                                            func_name))
         set_isolation_level(connection, old_isolation_level)
         connection.commit()
         # Get 'oid' from newly created event trigger

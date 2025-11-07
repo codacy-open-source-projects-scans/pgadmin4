@@ -2,12 +2,12 @@
 //
 // pgAdmin 4 - PostgreSQL Tools
 //
-// Copyright (C) 2013 - 2024, The pgAdmin Development Team
+// Copyright (C) 2013 - 2025, The pgAdmin Development Team
 // This software is released under the PostgreSQL Licence
 //
 //////////////////////////////////////////////////////////////
 
-import React, { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { styled } from '@mui/material/styles';
 import gettext from 'sources/gettext';
 import PropTypes from 'prop-types';
@@ -49,13 +49,6 @@ const StyledPopper = styled(Popper)(({theme}) => ({
       textAlign: 'right',
     }
   },
-
-
-
-
-
-
-
 }));
 
 export default function FloatingNote({open, onClose, anchorEl, rows, noteNode}) {
@@ -69,8 +62,7 @@ export default function FloatingNote({open, onClose, anchorEl, rows, noteNode}) 
 
   const header = useMemo(()=>{
     if(noteNode) {
-      let [schema, name] = noteNode.getSchemaTableName();
-      return `${name} (${schema})`;
+      return noteNode.getDisplayName();
     }
     return '';
   }, [open]);

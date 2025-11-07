@@ -2,7 +2,7 @@
 //
 // pgAdmin 4 - PostgreSQL Tools
 //
-// Copyright (C) 2013 - 2024, The pgAdmin Development Team
+// Copyright (C) 2013 - 2025, The pgAdmin Development Team
 // This software is released under the PostgreSQL Licence
 //
 //////////////////////////////////////////////////////////////
@@ -57,11 +57,13 @@ define('pgadmin.node.sequence', [
           applies: ['object', 'context'], callback: 'show_obj_properties',
           category: 'create', priority: 4, label: gettext('Sequence...'),
           data: {action: 'create', check: true}, enable: 'canCreate',
+          shortcut_preference: ['browser', 'sub_menu_create'],
         },{
           name: 'create_sequence', node: 'sequence', module: this,
           applies: ['object', 'context'], callback: 'show_obj_properties',
           category: 'create', priority: 4, label: gettext('Sequence...'),
           data: {action: 'create', check: true}, enable: 'canCreate',
+          shortcut_preference: ['browser', 'sub_menu_create'],
         },{
           name: 'create_sequence', node: 'schema', module: this,
           applies: ['object', 'context'], callback: 'show_obj_properties',

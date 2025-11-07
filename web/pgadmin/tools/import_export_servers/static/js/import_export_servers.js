@@ -2,12 +2,11 @@
 //
 // pgAdmin 4 - PostgreSQL Tools
 //
-// Copyright (C) 2013 - 2024, The pgAdmin Development Team
+// Copyright (C) 2013 - 2025, The pgAdmin Development Team
 // This software is released under the PostgreSQL Licence
 //
 //////////////////////////////////////////////////////////////
 
-import React from 'react';
 import gettext from 'sources/gettext';
 import ImportExportServers from './ImportExportServers';
 import { BROWSER_PANELS } from '../../../../browser/static/js/constants';
@@ -38,6 +37,7 @@ export default class ImportExportServersModule {
       enable: isDefaultWorkspace,
       priority: 3,
       label: gettext('Import/Export Servers...'),
+      permission: 'tools_import_export_servers',
     }];
 
     pgAdmin.Browser.add_menus(menus);

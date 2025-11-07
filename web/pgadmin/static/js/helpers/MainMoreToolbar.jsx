@@ -2,7 +2,7 @@
 //
 // pgAdmin 4 - PostgreSQL Tools
 //
-// Copyright (C) 2013 - 2024, The pgAdmin Development Team
+// Copyright (C) 2013 - 2025, The pgAdmin Development Team
 // This software is released under the PostgreSQL Licence
 //
 //////////////////////////////////////////////////////////////
@@ -14,9 +14,9 @@ import { PgIconButton } from '../components/Buttons';
 import gettext from 'sources/gettext';
 import MoreVertIcon from '@mui/icons-material/MoreVert';
 import { BROWSER_PANELS } from '../../../browser/static/js/constants';
-import { defaultTabsData } from '../BrowserComponent';
+import PropTypes from 'prop-types';
 
-export default function MainMoreToolbar() {
+export default function MainMoreToolbar({tabsData}) {
   const layoutDocker = React.useContext(LayoutDockerContext);
   return (
     <Box display="flex" alignItems="center">
@@ -29,7 +29,7 @@ export default function MainMoreToolbar() {
             label: 'Open',
             getMenuItems: ()=>{
               const ret = [];
-              defaultTabsData.forEach((t)=>{
+              tabsData.forEach((t)=>{
                 if(!layoutDocker.isTabOpen(t.id)) {
                   ret.push({
                     label: t.title,
@@ -51,3 +51,6 @@ export default function MainMoreToolbar() {
     </Box>
   );
 }
+MainMoreToolbar.propTypes = {
+  tabsData: PropTypes.array
+};

@@ -2,7 +2,7 @@
 //
 // pgAdmin 4 - PostgreSQL Tools
 //
-// Copyright (C) 2013 - 2024, The pgAdmin Development Team
+// Copyright (C) 2013 - 2025, The pgAdmin Development Team
 // This software is released under the PostgreSQL Licence
 //
 //////////////////////////////////////////////////////////////
@@ -128,6 +128,7 @@ let webpackShimConfig = {
     'pgadmin.node.synonym': path.join(__dirname, './pgadmin/browser/server_groups/servers/databases/schemas/synonyms/static/js/synonym'),
     'pgadmin.node.table': path.join(__dirname, './pgadmin/browser/server_groups/servers/databases/schemas/tables/static/js/table'),
     'pgadmin.node.tablespace': path.join(__dirname, './pgadmin/browser/server_groups/servers/tablespaces/static/js/tablespace'),
+    'pgadmin.node.directory': path.join(__dirname, './pgadmin/browser/server_groups/servers/directories/static/js/directory'),
     'pgadmin.node.trigger': path.join(__dirname, './pgadmin/browser/server_groups/servers/databases/schemas/tables/triggers/static/js/trigger'),
     'pgadmin.node.trigger_function': path.join(__dirname, './pgadmin/browser/server_groups/servers/databases/schemas/functions/static/js/trigger_function'),
     'pgadmin.node.type': path.join(__dirname, './pgadmin/browser/server_groups/servers/databases/schemas/types/static/js/type'),
@@ -154,7 +155,7 @@ let webpackShimConfig = {
     'pgadmin.tools.erd': path.join(__dirname, './pgadmin/tools/erd/static/js/'),
     'pgadmin.tools.psql': path.join(__dirname, './pgadmin/tools/psql/static/js/'),
     'pgadmin.tools.sqleditor': path.join(__dirname, './pgadmin/tools/sqleditor/static/js/'),
-    'pgadmin.tools.user_management': path.join(__dirname, './pgadmin/tools/user_management/static/js/user_management'),
+    'pgadmin.tools.user_management': path.join(__dirname, './pgadmin/tools/user_management/static/js/'),
     'pgadmin.user_management.current_user': '/user_management/current_user',
   },
   externals: [

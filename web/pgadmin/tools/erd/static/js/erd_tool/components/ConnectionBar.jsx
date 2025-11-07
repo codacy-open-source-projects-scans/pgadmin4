@@ -2,18 +2,18 @@
 //
 // pgAdmin 4 - PostgreSQL Tools
 //
-// Copyright (C) 2013 - 2024, The pgAdmin Development Team
+// Copyright (C) 2013 - 2025, The pgAdmin Development Team
 // This software is released under the PostgreSQL Licence
 //
 //////////////////////////////////////////////////////////////
 
-import React, { useMemo } from 'react';
+import { useMemo } from 'react';
 import { styled } from '@mui/material/styles';
 import gettext from 'sources/gettext';
 import PropTypes from 'prop-types';
 import { DefaultButton, PgButtonGroup, PgIconButton } from '../../../../../../static/js/components/Buttons';
 import { Box, Tooltip, CircularProgress } from '@mui/material';
-import { ConnectedIcon, DisonnectedIcon } from '../../../../../../static/js/components/ExternalIcon';
+import { ConnectedIcon, DisconnectedIcon } from '../../../../../../static/js/components/ExternalIcon';
 
 const StyledBox = styled(Box)(({theme}) => ({
   padding: '2px 4px',
@@ -42,10 +42,10 @@ export const STATUS = {
 function ConnectionStatusIcon({status}) {
   if(status == STATUS.CONNECTING) {
     return <CircularProgress style={{height: '18px', width: '18px'}} />;
-  } else if(status == STATUS.CONNECTED || status == STATUS.FAILED) {
+  } else if(status == STATUS.CONNECTED) {
     return <ConnectedIcon />;
   } else {
-    return <DisonnectedIcon />;
+    return <DisconnectedIcon />;
   }
 }
 

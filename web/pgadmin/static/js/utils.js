@@ -2,7 +2,7 @@
 //
 // pgAdmin 4 - PostgreSQL Tools
 //
-// Copyright (C) 2013 - 2024, The pgAdmin Development Team
+// Copyright (C) 2013 - 2025, The pgAdmin Development Team
 // This software is released under the PostgreSQL Licence
 //
 //////////////////////////////////////////////////////////////////////////
@@ -11,13 +11,15 @@ import _ from 'lodash';
 import gettext from 'sources/gettext';
 import { hasTrojanSource } from 'anti-trojan-source';
 import convert from 'convert-units';
+import Papa from 'papaparse';
 import getApiInstance from './api_instance';
 import usePreferences from '../../preferences/static/js/store';
 import pgAdmin from 'sources/pgadmin';
 import { isMac } from './keyboard_shortcuts';
 import { WORKSPACES } from '../../browser/static/js/constants';
+import { getCode } from '@fluentui/keyboard-key';
 
-export function parseShortcutValue(obj) {
+export function parseShortcutValue(obj, useCode=false) {
   let shortcut = '';
   if (!obj){
     return null;
@@ -26,11 +28,11 @@ export function parseShortcutValue(obj) {
   if (obj.shift) { shortcut += 'shift+'; }
   if (isMac() && obj.ctrl_is_meta) { shortcut += 'meta+'; }
   else if (obj.control) { shortcut += 'ctrl+'; }
-  shortcut += obj?.key.char?.toLowerCase();
+  shortcut += useCode ? obj?.key.key_code : obj?.key.char?.toLowerCase();
   return shortcut;
 }
 
-export function parseKeyEventValue(e) {
+export function parseKeyEventValue(e, useCode=false) {
   let shortcut = '';
   if(!e) {
     return null;
@@ -39,13 +41,22 @@ export function parseKeyEventValue(e) {
   if (e.shiftKey) { shortcut += 'shift+'; }
   if (isMac() && e.metaKey) { shortcut += 'meta+'; }
   else if (e.ctrlKey) { shortcut += 'ctrl+'; }
-  shortcut += e.key.toLowerCase();
+  shortcut += useCode? getCode(e) : e.key.toLowerCase();
   return shortcut;
 }
 
 export function isShortcutValue(obj) {
   if(!obj) return false;
   return [obj.alt, obj.control, obj?.key, obj?.key?.char].every((k)=>!_.isUndefined(k));
+}
+
+export function getEnterKeyHandler(clickHandler) {
+  return (e)=>{
+    if(e.code === 'Enter'){
+      e.preventDefault();
+      clickHandler(e);
+    }
+  };
 }
 
 // Convert shortcut obj to codemirror key format
@@ -251,85 +262,28 @@ export function sprintf(i_str) {
   }
 }
 
-// Modified ref: http://stackoverflow.com/a/1293163/2343 to suite pgAdmin.
 // This will parse a delimited string into an array of arrays.
 export function CSVToArray(strData, strDelimiter, quoteChar){
-  strDelimiter = strDelimiter || ',';
-  quoteChar = quoteChar || '"';
 
-  // Create a regular expression to parse the CSV values.
-  let objPattern = new RegExp(
-    (
-    // Delimiters.
-      '(\\' + strDelimiter + '|\\r?\\n|\\r|^)' +
-            // Quoted fields.
-            (quoteChar == '"' ? '(?:"([^"]*(?:""[^"]*)*)"|' : '(?:\'([^\']*(?:\'\'[^\']*)*)\'|') +
-            // Standard fields.
-            (quoteChar == '"' ? '([^"\\' + strDelimiter + '\\r\\n]*))': '([^\'\\' + strDelimiter + '\\r\\n]*))')
-    ),
-    'gi'
-  );
+  // Use papaparse to parse the CSV data
+  const parsedResult = Papa.parse(strData, {
+    delimiter: strDelimiter,
+    quoteChar: quoteChar,
+  });
 
-  // Create an array to hold our data. Give the array
-  // a default empty first row.
-  let arrData = [[]];
-
-  // The regex doesn't handle and skips start value if
-  // string starts with delimiter
-  if(strData.startsWith(strDelimiter)) {
-    arrData[ arrData.length - 1 ].push(null);
-  }
-
-  // Create an array to hold our individual pattern
-  // matching groups.
-  let arrMatches = null;
-
-  // Keep looping over the regular expression matches
-  // until we can no longer find a match.
-  while ((arrMatches = objPattern.exec( strData ))){
-    // Get the delimiter that was found.
-    let strMatchedDelimiter = arrMatches[ 1 ];
-
-    // Check to see if the given delimiter has a length
-    // (is not the start of string) and if it matches
-    // field delimiter. If id does not, then we know
-    // that this delimiter is a row delimiter.
-    if (strMatchedDelimiter.length && strMatchedDelimiter !== strDelimiter){
-      // Since we have reached a new row of data,
-      // add an empty row to our data array.
-      arrData.push( [] );
-    }
-
-    let strMatchedValue;
-
-    // Now that we have our delimiter out of the way,
-    // let's check to see which kind of value we
-    // captured (quoted or unquoted).
-    if (arrMatches[ 2 ]){
-      // We found a quoted value. When we capture
-      // this value, unescape any quotes.
-      strMatchedValue = arrMatches[ 2 ].replace(new RegExp( quoteChar+quoteChar, 'g' ), quoteChar);
-    } else {
-      // We found a non-quoted value.
-      strMatchedValue = arrMatches[ 3 ];
-    }
-    // Now that we have our value string, let's add
-    // it to the data array.
-    arrData[ arrData.length - 1 ].push( strMatchedValue );
-  }
   // Return the parsed data.
-  return arrData;
+  return parsedResult.data;
 }
 
 export function hasBinariesConfiguration(pgBrowser, serverInformation) {
   const module = 'paths';
   let preference_name = 'pg_bin_dir';
-  let msg = gettext('Please configure the PostgreSQL Binary Path in the Preferences dialog.');
+  let msg = gettext('Please configure the PostgreSQL Binary Path in the Preferences.');
 
   if ((serverInformation.type && serverInformation.type === 'ppas') ||
     serverInformation.server_type === 'ppas') {
     preference_name = 'ppas_bin_dir';
-    msg = gettext('Please configure the EDB Advanced Server Binary Path in the Preferences dialog.');
+    msg = gettext('Please configure the EDB Advanced Server Binary Path in the Preferences.');
   }
 
   const preference = usePreferences.getState().getPreferences(module, preference_name);
@@ -379,7 +333,7 @@ export function evalFunc(obj, func, ...param) {
 
 export function getBrowser() {
   if(navigator.userAgent.indexOf('Electron') >= 0) {
-    return {name: 'Electron', version: navigator.userAgent.match(/Electron\/([\d\.]+\d+)/)[1]};
+    return {name: 'Electron', version: /Electron\/([\d.]+\d+)/.exec(navigator.userAgent)[1]};
   }
 
   let ua=navigator.userAgent,tem,M=(/(opera|chrome|safari|firefox|msie|trident(?=\/))\/?\s*(\d+)/i).exec(ua) || [];
@@ -388,7 +342,7 @@ export function getBrowser() {
     return {name:'IE', version:(tem[1]||'')};
   }
   if(ua.indexOf('Electron') >= 0) {
-    return {name: 'Electron', version: ua.match(/Electron\/([\d\.]+\d+)/)[1]};
+    return {name: 'Electron', version: /Electron\/([\d.]+\d+)/.exec(ua)[1]};
   }
 
   if(M[1]==='Chrome') {
@@ -415,31 +369,7 @@ export function checkTrojanSource(content, isPasteEvent) {
   }
 }
 
-export function downloadBlob(blob, fileName) {
-  if (getBrowser() == 'IE' && window.navigator.msSaveBlob) {
-    // IE10+ : (has Blob, but not a[download] or URL)
-    window.navigator.msSaveBlob(blob, fileName);
-  } else {
-    const urlCreator = window.URL || window.webkitURL;
-    const downloadUrl = urlCreator.createObjectURL(blob);
-
-    const link = document.createElement('a');
-    link.setAttribute('href', downloadUrl);
-    link.setAttribute('download', fileName);
-    link.style.setProperty('visibility ', 'hidden');
-
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  }
-}
-
-export function downloadFile(textData, fileName, fileType) {
-  const respBlob = new Blob([textData], {type : fileType});
-  downloadBlob(respBlob, fileName);
-}
-
-export function toPrettySize(rawSize, from='B') {
+export function toPrettySize(rawSize, from='B', decimalFixed=null) {
   try {
     //if the integer need to be converted to K for thousands, M for millions , B for billions only
     if (from == '') {
@@ -447,6 +377,9 @@ export function toPrettySize(rawSize, from='B') {
     }
     let conVal = convert(rawSize).from(from).toBest();
     conVal.val = Math.round(conVal.val * 100) / 100;
+    if(decimalFixed) {
+      conVal.val = conVal.val.toFixed(decimalFixed);
+    }
     return `${conVal.val} ${conVal.unit}`;
   }
   catch {
@@ -627,17 +560,6 @@ export function requestAnimationAndFocus(ele) {
   });
 }
 
-export function measureText(text, font) {
-  if(!measureText.ele) {
-    measureText.ele = document.createElement('div');
-    measureText.ele.style.cssText = `position: absolute; visibility: hidden; white-space: nowrap; font: ${font}`;
-    document.body.appendChild(measureText.ele);
-  }
-  measureText.ele.innerHTML = text;
-  const dim = measureText.ele.getBoundingClientRect();
-  return {width: dim.width, height: dim.height};
-}
-
 const CHART_THEME_COLORS = {
   'light':['#1F77B4', '#FF7F0E', '#2CA02C', '#D62728', '#9467BD', '#8C564B',
     '#E377C2', '#7F7F7F', '#BCBD22', '#17BECF', '#3366CC', '#DC3912', '#FF9900',
@@ -663,7 +585,7 @@ export function getRandomColor() {
 
 // Using this function instead of 'btoa' directly.
 // https://developer.mozilla.org/en-US/docs/Glossary/Base64#the_unicode_problem
-function stringToBase64(str) {
+export function stringToBase64(str) {
   return btoa(
     Array.from(
       new TextEncoder().encode(str),

@@ -2,7 +2,7 @@
 //
 // pgAdmin 4 - PostgreSQL Tools
 //
-// Copyright (C) 2013 - 2024, The pgAdmin Development Team
+// Copyright (C) 2013 - 2025, The pgAdmin Development Team
 // This software is released under the PostgreSQL Licence
 //
 //////////////////////////////////////////////////////////////
@@ -26,13 +26,15 @@ class TagsSchema extends BaseUISchema {
         id: 'text', label: gettext('Text'), cell: 'text', group: null,
         mode: ['create', 'edit'], noEmpty: true, controlProps: {
           maxLength: 30,
-        }
+        },
+        disabled : this.top.isShared(this.top.origData),
       },
       {
         id: 'color', label: gettext('Color'), cell: 'color', group: null,
         mode: ['create', 'edit'], controlProps: {
           input: true,
-        }
+        },
+        disabled : this.top.isShared(this.top.origData),
       },
     ];
   }
@@ -46,7 +48,7 @@ class TagsSchema extends BaseUISchema {
 }
 
 export function getConnectionParameters() {
-  return [{
+  let conParams = [{
     'value': 'hostaddr', 'label': gettext('Host address'), 'vartype': 'string'
   }, {
     'value': 'passfile', 'label': gettext('Password file'), 'vartype': 'file'
@@ -134,7 +136,46 @@ export function getConnectionParameters() {
     'value': 'load_balance_hosts', 'label': gettext('Load balance hosts'),
     'vartype': 'enum', 'min_server_version': '16',
     'enumvals': [gettext('disable'), gettext('random')]
+  }, {
+    'value': 'gssdelegation', 'label': gettext('GSS delegation?'), 'vartype': 'bool',
+    'min_server_version': '16'
+  }, {
+    'value': 'require_auth', 'label': gettext('Require authentication'), 'vartype': 'string',
+    'min_server_version': '16'
+  }, {
+    'value': 'sslnegotiation', 'label': gettext('SSL negotiation'),
+    'vartype': 'enum', 'enumvals': [gettext('postgres'), gettext('direct')],
+    'min_server_version': '17'
+  }, {
+    'value': 'sslkeylogfile', 'label': gettext('SSL Key Logfile'), 'vartype': 'file',
+    'min_server_version': '18'
+  }, {
+    'value': 'min_protocol_version', 'label': gettext('Min protocol version'),
+    'vartype': 'enum', 'min_server_version': '18',
+    'enumvals': [gettext('3.0'), gettext('3.2'), gettext('latest')]
+  }, {
+    'value': 'max_protocol_version', 'label': gettext('Max protocol version'),
+    'vartype': 'enum', 'min_server_version': '18',
+    'enumvals': [gettext('3.0'), gettext('3.2'), gettext('latest')]
+  }, {
+    'value': 'oauth_issuer', 'label': gettext('OAuth issuer'), 'vartype': 'string',
+    'min_server_version': '18'
+  }, {
+    'value': 'oauth_client_id', 'label': gettext('OAuth client id'), 'vartype': 'string',
+    'min_server_version': '18'
+  }, {
+    'value': 'oauth_client_secret', 'label': gettext('OAuth client secret'), 'vartype': 'password',
+    'min_server_version': '18'
+  }, {
+    'value': 'oauth_scope', 'label': gettext('OAuth scope'), 'vartype': 'string',
+    'min_server_version': '18'
   }];
+
+  conParams.sort(function (a, b) {
+    return pgAdmin.natural_sort(a.value, b.value);
+  });
+
+  return conParams;
 };
 
 export default class ServerSchema extends BaseUISchema {
@@ -153,7 +194,8 @@ export default class ServerSchema extends BaseUISchema {
       connect_now: true,
       password: undefined,
       save_password: false,
-      db_res: [],
+      db_res: undefined,
+      db_res_type: 'databases',
       passexec: undefined,
       passexec_expiration: undefined,
       service: undefined,
@@ -163,6 +205,7 @@ export default class ServerSchema extends BaseUISchema {
       tunnel_port: 22,
       tunnel_username: undefined,
       tunnel_identity_file: undefined,
+      tunnel_prompt_password: false,
       tunnel_password: undefined,
       tunnel_authentication: false,
       tunnel_keep_alive: 0,
@@ -192,6 +235,10 @@ export default class ServerSchema extends BaseUISchema {
 
   isConnected(state) {
     return Boolean(state.connected);
+  }
+
+  isConnectedOrShared(state) {
+    return this.isConnected(state) || this.isShared(state);
   }
 
   get baseFields() {
@@ -284,7 +331,7 @@ export default class ServerSchema extends BaseUISchema {
       },
       {
         id: 'comment', label: gettext('Comments'), type: 'multiline', group: null,
-        mode: ['properties', 'edit', 'create'],
+        mode: ['properties', 'edit', 'create'], disabled: obj.isShared,
       }, {
         id: 'connection_string', label: gettext('Connection String'), type: 'multiline',
         group: gettext('Connection'), mode: ['properties'], readonly: true,
@@ -315,7 +362,7 @@ export default class ServerSchema extends BaseUISchema {
         }
       },{
         id: 'db', label: gettext('Maintenance database'), type: 'text', group: gettext('Connection'),
-        mode: ['properties', 'edit', 'create'], readonly: obj.isConnected, disabled: obj.isShared,
+        mode: ['properties', 'edit', 'create'], readonly: obj.isConnectedOrShared,
         noEmpty: true,
       },{
         id: 'username', label: gettext('Username'), type: 'text', group: gettext('Connection'),
@@ -331,7 +378,7 @@ export default class ServerSchema extends BaseUISchema {
         }
       },{
         id: 'kerberos_conn', label: gettext('Kerberos authentication?'), type: 'switch',
-        group: gettext('Connection'),
+        group: gettext('Connection'), disabled: obj.isShared,
       },{
         id: 'gss_authenticated', label: gettext('GSS authenticated?'), type: 'switch',
         group: gettext('Connection'), mode: ['properties'], visible: obj.isConnected,
@@ -341,22 +388,25 @@ export default class ServerSchema extends BaseUISchema {
       },{
         id: 'password', label: gettext('Password'), type: 'password',
         group: gettext('Connection'),
-        mode: ['create'],
-        deps: ['connect_now', 'kerberos_conn'],
-        visible: function(state) {
-          return state.connect_now && obj.isNew(state);
-        },
+        mode: ['create', 'edit'],
+        deps: ['kerberos_conn', 'save_password'],
         controlProps: {
           maxLength: null,
           autoComplete: 'new-password'
         },
+        readonly: function(state) {
+          if (obj.isNew())
+            return false;
+          return state.connected || !state.save_password;
+        },
         disabled: function(state) {return state.kerberos_conn;},
+        helpMessage: gettext('In edit mode the password field is enabled only if Save Password is set to true.')
       },{
         id: 'save_password', label: gettext('Save password?'),
-        type: 'switch', group: gettext('Connection'), mode: ['create'],
-        deps: ['connect_now', 'kerberos_conn'],
-        visible: function(state) {
-          return state.connect_now && obj.isNew(state);
+        type: 'switch', group: gettext('Connection'), mode: ['create', 'edit'],
+        deps: ['kerberos_conn'],
+        readonly: function(state) {
+          return state.connected;
         },
         disabled: function(state) {
           return !current_user.allow_save_password || state.kerberos_conn;
@@ -366,7 +416,7 @@ export default class ServerSchema extends BaseUISchema {
         mode: ['properties', 'edit', 'create'], readonly: obj.isConnected,
       },{
         id: 'service', label: gettext('Service'), type: 'text',
-        mode: ['properties', 'edit', 'create'], readonly: obj.isConnected,
+        mode: ['properties', 'edit', 'create'], readonly: obj.isConnectedOrShared,
         group: gettext('Connection'),
       }, {
         id: 'connection_params', label: gettext('Connection Parameters'),
@@ -441,7 +491,22 @@ export default class ServerSchema extends BaseUISchema {
           maxLength: null
         },
         readonly: obj.isConnected,
-      }, {
+      },
+      {
+        id: 'tunnel_prompt_password', label: gettext('Prompt for password?'),
+        type: 'switch', group: gettext('SSH Tunnel'), mode: ['properties', 'edit', 'create'],
+        deps: ['tunnel_authentication', 'use_ssh_tunnel'],
+        depChange: (state)=>{
+          if (!state.tunnel_authentication) {
+            return {tunnel_prompt_password: false};
+          }
+        },
+        disabled: function(state) {
+          return !state.tunnel_authentication || !state.use_ssh_tunnel;
+        },
+        helpMessage: gettext('This setting applies only when using an identity file. An identity file may or may not have a password. If set to true the system will prompt for the password.')
+      },
+      {
         id: 'save_tunnel_password', label: gettext('Save password?'),
         type: 'switch', group: gettext('SSH Tunnel'), mode: ['create'],
         deps: ['connect_now', 'use_ssh_tunnel'],
@@ -462,10 +527,42 @@ export default class ServerSchema extends BaseUISchema {
         readonly: obj.isConnected,
       },
       {
-        id: 'db_res', label: gettext('DB restriction'), type: 'select', group: gettext('Advanced'),
-        options: [],
-        mode: ['properties', 'edit', 'create'], readonly: obj.isConnected, controlProps: {
-          multiple: true, allowClear: false, creatable: true, noDropdown: true, placeholder: 'Specify the databases to be restrict...'},
+        id: 'db_res_type', label: gettext('DB restriction type'), type: 'toggle',
+        mode: ['properties', 'edit', 'create'], group: gettext('Advanced'),
+        options: [
+          {'label': gettext('Databases'), value: 'databases'},
+          {'label': gettext('SQL'), value: 'sql'},
+        ],
+        readonly: obj.isConnectedOrShared,
+        depChange: ()=>{
+          return {
+            db_res: null,
+          };
+        }
+      },
+      {
+        id: 'db_res', label: gettext('DB restriction'), group: gettext('Advanced'),
+        mode: ['properties', 'edit', 'create'], readonly: obj.isConnectedOrShared,
+        deps: ['db_res_type'],
+        type: (state) => {
+          if (state.db_res_type == 'databases') {
+            return {
+              type: 'select',
+              options: [],
+              controlProps: {
+                multiple: true,
+                allowClear: false,
+                creatable: true,
+                noDropdown: true,
+                placeholder: 'Specify the databases to be restrict...'
+              }
+            };
+          } else {
+            return {
+              type: 'sql',
+            };
+          }
+        },
       },
       {
         id: 'passexec_cmd', label: gettext('Password exec command'), type: 'text',
@@ -484,14 +581,22 @@ export default class ServerSchema extends BaseUISchema {
       },
       {
         id: 'prepare_threshold', label: gettext('Prepare threshold'), type: 'int',
-        group: gettext('Advanced'),
+        group: gettext('Advanced'), disabled: obj.isShared,
         mode: ['properties', 'edit', 'create'],
         helpMessageMode: ['edit', 'create'],
         helpMessage: gettext('If it is set to 0, every query is prepared the first time it is executed. If it is set to blank, prepared statements are disabled on the connection.')
       },
       {
+        id: 'post_connection_sql', label: gettext('Post Connection SQL'),
+        group: gettext('Post Connection SQL'),
+        mode: ['properties', 'edit', 'create'],
+        type: 'sql', isFullTab: true,
+        readonly: obj.isConnectedOrShared,
+        helpMessage: gettext('Any query specified in the control below will be executed with autocommit mode enabled for each connection to any database on this server.'),
+      },
+      {
         id: 'tags', label: gettext('Tags'),
-        type: 'collection', group: gettext('Tags'),
+        type: 'collection', group: gettext('Tags'), disabled: obj.isShared,
         schema: this.tagsSchema, mode: ['edit', 'create'], uniqueCol: ['text'],
         canAdd: true, canEdit: false, canDelete: true, maxCount: pgAdmin.Browser.utils.max_server_tags_allowed,
       },

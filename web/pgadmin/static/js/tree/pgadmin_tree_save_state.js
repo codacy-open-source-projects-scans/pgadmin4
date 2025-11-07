@@ -2,7 +2,7 @@
 //
 // pgAdmin 4 - PostgreSQL Tools
 //
-// Copyright (C) 2013 - 2024, The pgAdmin Development Team
+// Copyright (C) 2013 - 2025, The pgAdmin Development Team
 // This software is released under the PostgreSQL Licence
 //
 //////////////////////////////////////////////////////////////
@@ -108,7 +108,7 @@ _.extend(pgBrowser.browserTreeState, {
     /* Using fetch with keepalive as the browser may
     cancel the axios request on tab close. keepalive will
     make sure the request is completed */
-    callFetch(
+    return callFetch(
       url_for('settings.save_tree_state'), {
         keepalive: true,
         method: 'POST',

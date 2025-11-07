@@ -2,7 +2,7 @@
 #
 # pgAdmin 4 - PostgreSQL Tools
 #
-# Copyright (C) 2013 - 2024, The pgAdmin Development Team
+# Copyright (C) 2013 - 2025, The pgAdmin Development Team
 # This software is released under the PostgreSQL Licence
 #
 ##########################################################################
@@ -37,6 +37,8 @@ from pgadmin.browser.server_groups.servers.databases.schemas.tables.\
     columns import utils as column_utils
 from pgadmin.browser.server_groups.servers.databases.schemas.tables.\
     triggers import utils as trigger_utils
+from pgadmin.browser.server_groups.servers.databases.schemas.tables.\
+    utils import BaseTableView
 
 
 class ForeignTableModule(SchemaChildModule):
@@ -102,7 +104,7 @@ class ForeignTableModule(SchemaChildModule):
 blueprint = ForeignTableModule(__name__)
 
 
-class ForeignTableView(PGChildNodeView, DataTypeReader,
+class ForeignTableView(BaseTableView, DataTypeReader,
                        SchemaDiffObjectCompare):
     """
     class ForeignTableView(PGChildNodeView)
@@ -187,6 +189,9 @@ class ForeignTableView(PGChildNodeView, DataTypeReader,
     * compare(**kwargs):
       - This function will compare the foreign table nodes from two different
         schemas.
+
+    * truncate(gid, sid, scid, tid):
+      - This function will truncate foreign table object
     """
 
     node_type = blueprint.node_type
@@ -211,6 +216,7 @@ class ForeignTableView(PGChildNodeView, DataTypeReader,
             {'get': 'list', 'post': 'create', 'delete': 'delete'}
         ],
         'delete': [{'delete': 'delete'}, {'delete': 'delete'}],
+        'truncate': [{'put': 'truncate'}],
         'children': [{'get': 'children'}],
         'nodes': [{'get': 'node'}, {'get': 'nodes'}],
         'sql': [{'get': 'sql'}],
@@ -409,6 +415,9 @@ class ForeignTableView(PGChildNodeView, DataTypeReader,
             self.template_path = \
                 self.BASE_TEMPLATE_PATH.format(self.manager.version)
 
+            self.table_template_path = compile_template_path(
+                'tables/sql', self.manager.version)
+
             self.foreign_table_column_template_path = compile_template_path(
                 'foreign_table_columns/sql', self.manager.version)
 
@@ -419,6 +428,11 @@ class ForeignTableView(PGChildNodeView, DataTypeReader,
             self.trigger_template_path = \
                 'triggers/sql/{0}/#{1}#'.format(self.manager.server_type,
                                                 self.manager.version)
+
+            self.allowed_privileges = ["a", "r", "w", "d", "D", "x", "t"]
+            if self.manager.version >= 170000:
+                self.allowed_privileges = \
+                    ["a", "r", "w", "d", "D", "x", "t", "m"]
 
             return f(*args, **kwargs)
 
@@ -880,6 +894,39 @@ class ForeignTableView(PGChildNodeView, DataTypeReader,
             return internal_server_error(errormsg=str(e))
 
     @check_precondition
+    def truncate(self, gid, sid, did, scid, foid):
+        """
+        This function will truncate the foreign table.
+
+         Args:
+           gid: Server Group ID
+           sid: Server ID
+           did: Database ID
+           scid: Schema ID
+           foid: Foreign Table ID
+        """
+
+        try:
+            SQL = render_template(
+                "/".join([self.template_path, self._PROPERTIES_SQL]),
+                did=did, scid=scid, foid=foid,
+                datlastsysoid=self._DATABASE_LAST_SYSTEM_OID
+            )
+            status, res = self.conn.execute_dict(SQL)
+            if not status:
+                return internal_server_error(errormsg=res)
+
+            if len(res['rows']) == 0:
+                return gone(gettext(self.not_found_error_msg()))
+
+            return super().truncate(
+                gid, sid, did, scid, foid, res
+            )
+
+        except Exception as e:
+            return internal_server_error(errormsg=str(e))
+
+    @check_precondition
     def sql(self, gid, sid, did, scid, foid=None, **kwargs):
         """
         Returns the SQL for the Foreign Table object.
@@ -914,7 +961,7 @@ class ForeignTableView(PGChildNodeView, DataTypeReader,
         # Parse Privileges
         if 'relacl' in data:
             data['relacl'] = parse_priv_to_db(data['relacl'],
-                                              ["a", "r", "w", "x"])
+                                              self.allowed_privileges)
 
         SQL = render_template("/".join([self.template_path,
                                         self._CREATE_SQL]),
@@ -991,7 +1038,7 @@ class ForeignTableView(PGChildNodeView, DataTypeReader,
             return internal_server_error(errormsg=str(e))
 
     @staticmethod
-    def _parse_privileges(data):
+    def _parse_privileges(data, allowed_privileges):
         """
         Parser privilege data as per type.
         :param data: Data.
@@ -999,13 +1046,13 @@ class ForeignTableView(PGChildNodeView, DataTypeReader,
         """
         if 'relacl' in data and 'added' in data['relacl']:
             data['relacl']['added'] = parse_priv_to_db(
-                data['relacl']['added'], ["a", "r", "w", "x"])
+                data['relacl']['added'], allowed_privileges)
         if 'relacl' in data and 'changed' in data['relacl']:
             data['relacl']['changed'] = parse_priv_to_db(
-                data['relacl']['changed'], ["a", "r", "w", "x"])
+                data['relacl']['changed'], allowed_privileges)
         if 'relacl' in data and 'deleted' in data['relacl']:
             data['relacl']['deleted'] = parse_priv_to_db(
-                data['relacl']['deleted'], ["a", "r", "w", "x"])
+                data['relacl']['deleted'], allowed_privileges)
 
     @staticmethod
     def _check_old_col_ops(old_col_frmt_options, option, col):
@@ -1120,7 +1167,7 @@ class ForeignTableView(PGChildNodeView, DataTypeReader,
                 data['schema'] = old_data['basensp']
 
             # Parse Privileges
-            ForeignTableView._parse_privileges(data)
+            ForeignTableView._parse_privileges(data, self.allowed_privileges)
 
             # If ftsrvname is changed while comparing two schemas
             # then we need to drop foreign table and recreate it
@@ -1175,7 +1222,7 @@ class ForeignTableView(PGChildNodeView, DataTypeReader,
             # Parse Privileges
             if 'relacl' in data:
                 data['relacl'] = parse_priv_to_db(data['relacl'],
-                                                  ["a", "r", "w", "x"])
+                                                  self.allowed_privileges)
 
             sql = render_template("/".join([self.template_path,
                                             self._CREATE_SQL]), data=data,

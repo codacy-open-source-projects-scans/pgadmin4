@@ -2,7 +2,7 @@
 #
 # pgAdmin 4 - PostgreSQL Tools
 #
-# Copyright (C) 2013 - 2024, The pgAdmin Development Team
+# Copyright (C) 2013 - 2025, The pgAdmin Development Team
 # This software is released under the PostgreSQL Licence
 #
 ##########################################################################
@@ -87,17 +87,6 @@ def index():
     return bad_request(
         errormsg=gettext("This URL cannot be called directly.")
     )
-
-
-@blueprint.route("/cloud.js")
-@pga_login_required
-def script():
-    """render own javascript"""
-    res = Response(response=render_template(
-        "cloud/js/cloud.js", _=gettext),
-        status=200,
-        mimetype=MIMETYPE_APP_JS)
-    return res
 
 
 @blueprint.route('/clear_cloud_session/',

@@ -2,7 +2,7 @@
 #
 # pgAdmin 4 - PostgreSQL Tools
 #
-# Copyright (C) 2013 - 2024, The pgAdmin Development Team
+# Copyright (C) 2013 - 2025, The pgAdmin Development Team
 # This software is released under the PostgreSQL Licence
 #
 ##########################################################################
@@ -90,6 +90,14 @@ class AddServerTest(BaseTestGenerator):
 
         if 'tags' in self.test_data:
             self.server['tags'] = self.test_data['tags']
+
+        if 'post_connection_sql' in self.test_data:
+            self.server['post_connection_sql'] = (
+                self.test_data)['post_connection_sql']
+
+        if 'db_res' in self.test_data:
+            self.server['db_res'] = (
+                self.test_data)['db_res']
 
         if self.is_positive_test:
             if hasattr(self, 'with_save'):

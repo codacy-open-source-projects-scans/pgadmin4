@@ -2,7 +2,7 @@
 //
 // pgAdmin 4 - PostgreSQL Tools
 //
-// Copyright (C) 2013 - 2024, The pgAdmin Development Team
+// Copyright (C) 2013 - 2025, The pgAdmin Development Team
 // This software is released under the PostgreSQL Licence
 //
 //////////////////////////////////////////////////////////////
@@ -32,6 +32,7 @@ import {
 } from './hooks';
 import { registerView, View } from './registry';
 import { createFieldControls, listenDepChanges } from './utils';
+import FormViewTab from './FormViewTab';
 
 const ErrorMessageBox = () => {
   const [key, setKey] = useState(0);
@@ -181,14 +182,8 @@ export default function FormView({
               action={(ref) => ref?.updateIndicator()}
             >{
                 finalGroups.map((tabGroup, idx) =>
-                  <Tab
-                    key={tabGroup.id}
-                    label={tabGroup.label}
-                    data-test={tabGroup.id}
-                    className={
-                      tabGroup.hasError &&
-                      tabValue != idx ? 'tab-with-error' : ''
-                    }
+                  <FormViewTab
+                    key={tabGroup.id} tabGroup={tabGroup} idx={idx} tabValue={tabValue}
                   />
                 )
               }{hasSQLTab &&
@@ -230,7 +225,7 @@ export default function FormView({
                   {
                     group.controls.map(
                       (item, idx) => <FieldControl
-                        item={item} key={idx} schemaId={schema._id} />
+                        item={item} key={`${item.controlProps.id}-${idx}`} schemaId={schema._id} />
                     )
                   }
                 </TabPanel>
@@ -282,10 +277,10 @@ export default function FormView({
             className={contentClassName.join(' ')}>
             {
               finalGroups.map((group, idx) =>
-                <React.Fragment key={idx}>{
+                <React.Fragment key={`${group.id}-${idx}`}>{
                   group.controls.map(
                     (item, idx) => <FieldControl
-                      item={item} key={idx} schemaId={schema._id}
+                      item={item} key={`${item.controlProps.id}-${idx}`} schemaId={schema._id}
                     />
                   )
                 }</React.Fragment>

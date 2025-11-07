@@ -2,13 +2,12 @@
 //
 // pgAdmin 4 - PostgreSQL Tools
 //
-// Copyright (C) 2013 - 2024, The pgAdmin Development Team
+// Copyright (C) 2013 - 2025, The pgAdmin Development Team
 // This software is released under the PostgreSQL Licence
 //
 //////////////////////////////////////////////////////////////
 
 
-import React from 'react';
 
 import { withTheme } from '../fake_theme';
 import { render } from '@testing-library/react';
@@ -59,7 +58,7 @@ describe('ShortcutTitle', ()=>{
     it('mac meta key', ()=>{
       shortcut.ctrl_is_meta = true;
       jest.spyOn(keyShort, 'isMac').mockReturnValue(true);
-      expect(shortcutToString(shortcut)).toBe('Cmd + Shift + K');
+      expect(shortcutToString(shortcut)).toEqual(['⌘', '⇧', 'K']);
     });
   });
 });

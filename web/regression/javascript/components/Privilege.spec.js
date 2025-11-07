@@ -2,13 +2,12 @@
 //
 // pgAdmin 4 - PostgreSQL Tools
 //
-// Copyright (C) 2013 - 2024, The pgAdmin Development Team
+// Copyright (C) 2013 - 2025, The pgAdmin Development Team
 // This software is released under the PostgreSQL Licence
 //
 //////////////////////////////////////////////////////////////
 
 
-import React from 'react';
 
 import Privilege from 'sources/components/Privilege';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';

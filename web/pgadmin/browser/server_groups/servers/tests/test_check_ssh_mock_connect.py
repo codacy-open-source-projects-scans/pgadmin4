@@ -2,7 +2,7 @@
 #
 # pgAdmin 4 - PostgreSQL Tools
 #
-# Copyright (C) 2013 - 2024, The pgAdmin Development Team
+# Copyright (C) 2013 - 2025, The pgAdmin Development Team
 # This software is released under the PostgreSQL Licence
 #
 ##########################################################################
@@ -77,6 +77,7 @@ class ServersSSHConnectTestCase(BaseTestGenerator):
                     self.service = service
                     self.save_password = 0
                     self.shared = None
+                    self.tunnel_prompt_password = 0
 
             mock_server_obj = TestMockServer(
                 self.mock_data['name'],

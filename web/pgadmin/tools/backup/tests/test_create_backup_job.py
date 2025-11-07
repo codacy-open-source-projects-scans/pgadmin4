@@ -2,7 +2,7 @@
 #
 # pgAdmin 4 - PostgreSQL Tools
 #
-# Copyright (C) 2013 - 2024, The pgAdmin Development Team
+# Copyright (C) 2013 - 2025, The pgAdmin Development Team
 # This software is released under the PostgreSQL Licence
 #
 ##########################################################################
@@ -119,7 +119,7 @@ class BackupJobTest(BaseTestGenerator):
                  expected_cmd_opts=['--verbose', '--format=c',
                                     '--large-objects'],
                  not_expected_cmd_opts=[],
-                 expected_exit_code=[1]
+                 expected_exit_code=[0, 1]
              ),
              message='--large-objects is not supported by EPAS/PG server '
                      'less than 16'

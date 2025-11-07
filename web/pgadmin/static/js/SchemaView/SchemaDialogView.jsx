@@ -2,12 +2,12 @@
 //
 // pgAdmin 4 - PostgreSQL Tools
 //
-// Copyright (C) 2013 - 2024, The pgAdmin Development Team
+// Copyright (C) 2013 - 2025, The pgAdmin Development Team
 // This software is released under the PostgreSQL Licence
 //
 //////////////////////////////////////////////////////////////
 
-import React, { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 
 import CloseIcon from '@mui/icons-material/Close';
 import DoneIcon from '@mui/icons-material/Done';
@@ -16,7 +16,7 @@ import HelpIcon from '@mui/icons-material/HelpRounded';
 import PublishIcon from '@mui/icons-material/Publish';
 import SaveIcon from '@mui/icons-material/Save';
 import SettingsBackupRestoreIcon from '@mui/icons-material/SettingsBackupRestore';
-import Box from '@mui/material/Box';
+import { Box } from '@mui/material';
 import _ from 'lodash';
 import PropTypes from 'prop-types';
 
@@ -37,12 +37,14 @@ import { useSchemaState } from './hooks';
 import { getForQueryParams } from './common';
 import { QueryToolIcon } from '../components/ExternalIcon';
 import TerminalRoundedIcon from '@mui/icons-material/TerminalRounded';
+import { WORKSPACES } from '../../../browser/static/js/constants';
 
 
 /* If its the dialog */
 export default function SchemaDialogView({
   getInitData, viewHelperProps, loadingText, schema={}, showFooter=true,
-  isTabView=true, checkDirtyOnEnableSave=false, customCloseBtnName=gettext('Close'), ...props
+  isTabView=true, checkDirtyOnEnableSave=false, customCloseBtnName=gettext('Close'), focusOnFirstInput=true,
+  ...props
 }) {
   // View helper properties
   const onDataChange  = props.onDataChange;
@@ -120,12 +122,12 @@ export default function SchemaDialogView({
   const onSaveClick = () => {
     // Do nothing when there is no change or there is an error
     if (
-      !schemaState._changes || Object.keys(schemaState._changes) === 0 ||
+      !schemaState._changes || Object.keys(schemaState._changes).length === 0 ||
       schemaState.errors.name
     ) return;
 
     setSaving(true);
-    setLoaderText('Saving...');
+    setLoaderText(schemaState.customLoadingText || gettext('Saving...'));
 
     if (!schema.warningText) {
       save(schemaState.changes(true));
@@ -167,9 +169,9 @@ export default function SchemaDialogView({
       return <PublishIcon />;
     } else if(props.customSaveBtnIconType == 'done') {
       return <DoneIcon />;
-    } else if(props.customSaveBtnIconType == 'Query Tool') {
+    } else if(props.customSaveBtnIconType == WORKSPACES.QUERY_TOOL) {
       return <QueryToolIcon />;
-    } else if(props.customSaveBtnIconType == 'PSQL') {
+    } else if(props.customSaveBtnIconType == WORKSPACES.PSQL_TOOL) {
       return <TerminalRoundedIcon style={{width:'unset'}}/>;
     }
     return <SaveIcon />;
@@ -189,7 +191,7 @@ export default function SchemaDialogView({
             isTabView={isTabView}
             className={props.formClassName}
             showError={true} resetKey={resetKey}
-            focusOnFirstInput={true}
+            focusOnFirstInput={focusOnFirstInput}
           />
         </Box>
         {showFooter &&
@@ -267,4 +269,5 @@ SchemaDialogView.propTypes = {
   Notifier: PropTypes.object,
   checkDirtyOnEnableSave: PropTypes.bool,
   customCloseBtnName: PropTypes.string,
+  focusOnFirstInput: PropTypes.bool,
 };

@@ -2,7 +2,7 @@
 #
 # pgAdmin 4 - PostgreSQL Tools
 #
-# Copyright (C) 2013 - 2024, The pgAdmin Development Team
+# Copyright (C) 2013 - 2025, The pgAdmin Development Team
 # This software is released under the PostgreSQL Licence
 #
 ##########################################################################
@@ -34,7 +34,13 @@ def get_explain_query_length(query_obj):
     Args:
         query_obj: sql query
     """
-    query = query_obj.query.decode()
+    try:
+        query = query_obj.query.decode()
+    except Exception:
+        try:
+            query = query_obj.query.decode('UTF-8')
+        except Exception:
+            query = query_obj.query.decode('UTF-8', errors='replace')
     if query.startswith("EXPLAIN"):
         return len(query)
     else:

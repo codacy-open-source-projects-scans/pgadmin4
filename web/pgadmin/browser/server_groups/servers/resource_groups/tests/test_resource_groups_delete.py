@@ -2,7 +2,7 @@
 #
 # pgAdmin 4 - PostgreSQL Tools
 #
-# Copyright (C) 2013 - 2024, The pgAdmin Development Team
+# Copyright (C) 2013 - 2025, The pgAdmin Development Team
 # This software is released under the PostgreSQL Licence
 #
 ##########################################################################
@@ -34,7 +34,7 @@ class ResourceGroupsDeleteTestCase(BaseTestGenerator):
                 self.skipTest(message)
             else:
                 if server_response["data"]["version"] < 90400:
-                    message = "Resource groups are not supported by PPAS " \
+                    message = "Resource groups are not supported by EPAS " \
                               "9.3 and below."
                     self.skipTest(message)
         self.resource_group = "test_resource_group_delete%s" % \

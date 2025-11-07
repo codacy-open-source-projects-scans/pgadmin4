@@ -2,14 +2,14 @@
 //
 // pgAdmin 4 - PostgreSQL Tools
 //
-// Copyright (C) 2013 - 2024, The pgAdmin Development Team
+// Copyright (C) 2013 - 2025, The pgAdmin Development Team
 // This software is released under the PostgreSQL Licence
 //
 //////////////////////////////////////////////////////////////
 
 /* React HOC on color pickr */
 import Pickr from '@simonwep/pickr';
-import React, { useEffect, useRef } from 'react';
+import { useEffect, useRef } from 'react';
 import gettext from 'sources/gettext';
 import PropTypes from 'prop-types';
 import { fullHexColor } from '../utils';

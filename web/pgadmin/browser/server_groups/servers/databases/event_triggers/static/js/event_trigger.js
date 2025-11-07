@@ -2,7 +2,7 @@
 //
 // pgAdmin 4 - PostgreSQL Tools
 //
-// Copyright (C) 2013 - 2024, The pgAdmin Development Team
+// Copyright (C) 2013 - 2025, The pgAdmin Development Team
 // This software is released under the PostgreSQL Licence
 //
 //////////////////////////////////////////////////////////////
@@ -52,11 +52,13 @@ define('pgadmin.node.event_trigger', [
           applies: ['object', 'context'], callback: 'show_obj_properties',
           category: 'create', priority: 4, label: gettext('Event Trigger...'),
           data: {action: 'create'},
+          shortcut_preference: ['browser', 'sub_menu_create'],
         },{
           name: 'create_event_trigger', node: 'event_trigger', module: this,
           applies: ['object', 'context'], callback: 'show_obj_properties',
           category: 'create', priority: 4, label: gettext('Event Trigger...'),
           data: {action: 'create'},
+          shortcut_preference: ['browser', 'sub_menu_create'],
         },{
           name: 'create_event_trigger', node: 'database', module: this,
           applies: ['object', 'context'], callback: 'show_obj_properties',

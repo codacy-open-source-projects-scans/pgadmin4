@@ -2,7 +2,7 @@
 #
 # pgAdmin 4 - PostgreSQL Tools
 #
-# Copyright (C) 2013 - 2024, The pgAdmin Development Team
+# Copyright (C) 2013 - 2025, The pgAdmin Development Team
 # This software is released under the PostgreSQL Licence
 #
 ##########################################################################
@@ -311,7 +311,7 @@ def create_app(app_name=None):
                 if user is not None:
                     user_id = user.id
             user_language = Preferences.raw_value(
-                'misc', 'user_language', 'user_language', user_id
+                'misc', 'user_language', 'user_interface', user_id
             )
             if user_language is not None:
                 language = user_language
@@ -349,6 +349,8 @@ def create_app(app_name=None):
         app.config['SECURITY_MSG_INVALID_PASSWORD'] = \
         (gettext("Incorrect username or password."), "error")
     app.config['SECURITY_PASSWORD_LENGTH_MIN'] = config.PASSWORD_LENGTH_MIN
+    app.config['SECURITY_MSG_UNAUTHORIZED'] = \
+        (gettext("Unauthorised access, permission denied."), "error")
 
     # Create database connection object and mailer
     db.init_app(app)
@@ -835,8 +837,9 @@ def create_app(app_name=None):
         # but the user session may still be active. Logout the user
         # to get the key again when login
         if config.SERVER_MODE and current_user.is_authenticated and \
-            session['auth_source_manager']['current_source'] not in [
-                KERBEROS, OAUTH2, WEBSERVER] and \
+            'auth_source_manager' in session and \
+            session['auth_source_manager']['current_source'] not in \
+            [KERBEROS, OAUTH2, WEBSERVER] and \
                 current_app.keyManager.get() is None and \
                 request.endpoint not in ('security.login', 'security.logout'):
             logout_user()

@@ -2,12 +2,12 @@
 //
 // pgAdmin 4 - PostgreSQL Tools
 //
-// Copyright (C) 2013 - 2024, The pgAdmin Development Team
+// Copyright (C) 2013 - 2025, The pgAdmin Development Team
 // This software is released under the PostgreSQL Licence
 //
 //////////////////////////////////////////////////////////////
 
-import React, { useCallback, useContext, useEffect, useState } from 'react';
+import { useCallback, useContext, useEffect, useState } from 'react';
 
 import { styled } from '@mui/material/styles';
 
@@ -17,7 +17,7 @@ import FormatIndentDecreaseIcon from '@mui/icons-material/FormatIndentDecrease';
 import PlayCircleFilledWhiteIcon from '@mui/icons-material/PlayCircleFilledWhite';
 import FiberManualRecordIcon from '@mui/icons-material/FiberManualRecord';
 import NotInterestedIcon from '@mui/icons-material/NotInterested';
-import StopIcon from '@mui/icons-material/Stop';
+import StopRoundedIcon from '@mui/icons-material/StopRounded';
 import HelpIcon from '@mui/icons-material/HelpRounded';
 import RotateLeftRoundedIcon from '@mui/icons-material/RotateLeftRounded';
 
@@ -180,7 +180,7 @@ export function ToolBar() {
           }} />
       </PgButtonGroup>
       <PgButtonGroup size="small">
-        <PgIconButton data-test='stop-debugger' title={gettext('Stop')} icon={<StopIcon style={{height: '2rem'}} />} disabled={buttonsDisabled[MENUS.STOP]} onClick={() => { stop(); }}
+        <PgIconButton data-test='stop-debugger' title={gettext('Stop')} icon={<StopRoundedIcon style={{height: '2rem'}} />} disabled={buttonsDisabled[MENUS.STOP]} onClick={() => { stop(); }}
           shortcut={preferences?.btn_stop} />
       </PgButtonGroup>
       <PgButtonGroup size="small">

@@ -2,13 +2,13 @@
 //
 // pgAdmin 4 - PostgreSQL Tools
 //
-// Copyright (C) 2013 - 2024, The pgAdmin Development Team
+// Copyright (C) 2013 - 2025, The pgAdmin Development Team
 // This software is released under the PostgreSQL Licence
 //
 //////////////////////////////////////////////////////////////
 import { Box } from '@mui/material';
 import { styled } from '@mui/material/styles';
-import React, { useEffect } from 'react';
+import { useEffect } from 'react';
 import { PrimaryButton } from './components/Buttons';
 import { PgMenu, PgMenuDivider, PgMenuItem, PgSubMenu } from './components/Menu';
 import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
@@ -90,6 +90,7 @@ export default function AppMenuBar() {
       hasCheck={hasCheck}
       checked={menuItem.checked}
       closeOnCheck={true}
+      shortcut={menuItem.shortcut}
     >{menuItem.label}</PgMenuItem>;
   };
 

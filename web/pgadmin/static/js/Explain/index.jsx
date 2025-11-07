@@ -2,7 +2,7 @@
 //
 // pgAdmin 4 - PostgreSQL Tools
 //
-// Copyright (C) 2013 - 2024, The pgAdmin Development Team
+// Copyright (C) 2013 - 2025, The pgAdmin Development Team
 // This software is released under the PostgreSQL Licence
 //
 //////////////////////////////////////////////////////////////
@@ -347,6 +347,46 @@ function parsePlan(data, ctx) {
       data['rowsx'] = Math.ceil10(data['rowsx'] / data['loops'] || 1, -2);
     } else {
       data['rowsx'] = Math.ceil10(data['rowsx'], -2);
+    }
+  }
+
+  const citusDistributedQuery = data['Distributed Query'];
+  if (citusDistributedQuery) {
+    // This is a Citus Distributed Query plan.
+    // It contains a 'Job' with one or more 'Tasks' in it.
+    // We'll convert those Tasks into sub-Plans of this main plan and process it
+    // with the regular Plan layout code.
+    delete data['Distributed Query'];
+
+    // Convert the Job into a 'Citus Job' sub-plan.
+    // That allows us to show details of the Task count etc.
+    const citusJob = citusDistributedQuery['Job'];
+    const jobPlan = {
+      'Node Type': 'Citus Job',
+      ...citusJob
+    };
+    data['Plans'] = [jobPlan];
+
+    // Convert each of the Tasks into 'Citus Task' sub-plans of the Job plan.
+    const citusTasks = jobPlan['Tasks'];
+    if (citusTasks) {
+      delete jobPlan['Tasks'];
+
+      const citusTaskPlans = citusTasks.map(citusJobTask => {
+        const taskPlan = {
+          'Node Type': 'Citus Task',
+          ...citusJobTask
+        };
+
+        // A Citus Task contains a 'Remote Plan' which is the actual plan
+        // executed on the worker nodes. It's actually an array of arrays.
+        const remotePlan = taskPlan['Remote Plan'];
+        delete taskPlan['Remote Plan'];
+        // A Remote Plan is an array of arrays of Plans.
+        taskPlan['Plans'] = remotePlan.flatMap(arr => arr.map(planLevel1Entry => planLevel1Entry['Plan']));
+        return taskPlan;
+      });
+      jobPlan['Plans'] = citusTaskPlans;
     }
   }
 

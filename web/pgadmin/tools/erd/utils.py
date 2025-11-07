@@ -2,7 +2,7 @@
 #
 # pgAdmin 4 - PostgreSQL Tools
 #
-# Copyright (C) 2013 - 2024, The pgAdmin Development Team
+# Copyright (C) 2013 - 2025, The pgAdmin Development Team
 # This software is released under the PostgreSQL Licence
 #
 ##########################################################################
@@ -30,6 +30,10 @@ class ERDTableView(BaseTableView, DataTypeReader):
     def get_types(self, conn_id=None, did=None, sid=None):
         condition = self.get_types_condition_sql(False)
         return DataTypeReader.get_types(self, self.conn, condition, True)
+
+    @BaseTableView.check_precondition
+    def get_geometry_types(self, conn_id=None, did=None, sid=None):
+        return DataTypeReader.get_geometry_types(self, self.conn)
 
     @BaseTableView.check_precondition
     def fetch_all_tables(self, did=None, sid=None, scid=None):
@@ -108,6 +112,11 @@ class ERDHelper:
     def get_types(self):
         return self.table_view.get_types(
             conn_id=self.conn_id, did=self.did, sid=self.sid)
+
+    def get_geometry_types(self):
+        return self.table_view.get_geometry_types(
+            conn_id=self.conn_id, did=self.did, sid=self.sid
+        )
 
     def get_table_sql(self, data, with_drop=False):
         SQL, _ = self.table_view.sql(

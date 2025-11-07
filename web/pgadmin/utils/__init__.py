@@ -2,7 +2,7 @@
 #
 # pgAdmin 4 - PostgreSQL Tools
 #
-# Copyright (C) 2013 - 2024, The pgAdmin Development Team
+# Copyright (C) 2013 - 2025, The pgAdmin Development Team
 # This software is released under the PostgreSQL Licence
 #
 ##########################################################################
@@ -339,18 +339,18 @@ def does_utility_exist(file):
 
     if file is None:
         error_msg = gettext("Utility file not found. Please correct the Binary"
-                            " Path in the Preferences dialog")
+                            " Path in the Preferences")
         return error_msg
 
     if Path(config.STORAGE_DIR) == Path(file) or \
             Path(config.STORAGE_DIR) in Path(file).parents:
-        error_msg = gettext("Please correct the Binary Path in the Preferences"
-                            " dialog. pgAdmin storage directory can not be a"
-                            " utility binary directory.")
+        error_msg = gettext("Please correct the Binary Path in the "
+                            "Preferences. pgAdmin storage directory can not "
+                            "be a utility binary directory.")
 
     if not os.path.exists(file):
         error_msg = gettext("'%s' file not found. Please correct the Binary"
-                            " Path in the Preferences dialog" % file)
+                            " Path in the Preferences" % file)
     return error_msg
 
 
@@ -380,7 +380,7 @@ def get_binary_path_versions(binary_path: str) -> dict:
             # if path doesn't exist raise exception
             if not os.path.isdir(binary_path):
                 current_app.logger.warning('Invalid binary path.')
-                raise Exception()
+                raise FileNotFoundError()
             # Get the output of the '--version' command
             cmd = subprocess.run(
                 [full_path, '--version'],
@@ -390,8 +390,6 @@ def get_binary_path_versions(binary_path: str) -> dict:
             )
             if cmd.returncode == 0:
                 ret[utility] = cmd.stdout.split(") ", 1)[1].strip()
-            else:
-                raise Exception()
         except Exception as _:
             continue
 
@@ -515,6 +513,7 @@ def dump_database_servers(output_file, selected_servers,
             add_value(attr_dict, "Shared", server.shared)
             add_value(attr_dict, "SharedUsername", server.shared_username)
             add_value(attr_dict, "DBRestriction", server.db_res)
+            add_value(attr_dict, "DBRestrictionType", server.db_res_type)
             add_value(attr_dict, "BGColor", server.bgcolor)
             add_value(attr_dict, "FGColor", server.fgcolor)
             add_value(attr_dict, "Service", server.service)
@@ -524,11 +523,21 @@ def dump_database_servers(output_file, selected_servers,
             add_value(attr_dict, "TunnelUsername", server.tunnel_username)
             add_value(attr_dict, "TunnelAuthentication",
                       server.tunnel_authentication)
+            add_value(attr_dict, "TunnelIdentityFile",
+                      server.tunnel_identity_file)
+            add_value(attr_dict, "TunnelPromptPassword",
+                      server.tunnel_prompt_password)
+            add_value(attr_dict, "TunnelKeepAlive",
+                      server.tunnel_keep_alive)
             add_value(attr_dict, "KerberosAuthentication",
                       server.kerberos_conn),
             add_value(attr_dict, "ConnectionParameters",
                       server.connection_params)
             add_value(attr_dict, "Tags", server.tags)
+            add_value(attr_dict, "PrepareThreshold",
+                      server.prepare_threshold)
+            add_value(attr_dict, "PostConnectionSQL",
+                      server.post_connection_sql)
 
             # if desktop mode or server mode with
             # ENABLE_SERVER_PASS_EXEC_CMD flag is True
@@ -726,6 +735,8 @@ def load_database_servers(input_file, selected_servers,
 
             new_server.db_res = obj.get("DBRestriction", None)
 
+            new_server.db_res_type = obj.get("DBRestrictionType", None)
+
             if 'ConnectionParameters' in obj:
                 new_server.connection_params = \
                     obj.get("ConnectionParameters", None)
@@ -761,6 +772,15 @@ def load_database_servers(input_file, selected_servers,
             new_server.tunnel_authentication = \
                 obj.get("TunnelAuthentication", None)
 
+            new_server.tunnel_identity_file = \
+                obj.get("TunnelIdentityFile", None)
+
+            new_server.tunnel_prompt_password = \
+                obj.get("TunnelPromptPassword", 0)
+
+            new_server.tunnel_keep_alive = \
+                obj.get("TunnelKeepAlive", None)
+
             new_server.shared = obj.get("Shared", None)
 
             new_server.shared_username = obj.get("SharedUsername", None)
@@ -768,6 +788,10 @@ def load_database_servers(input_file, selected_servers,
             new_server.kerberos_conn = obj.get("KerberosAuthentication", None)
 
             new_server.tags = obj.get("Tags", None)
+
+            new_server.prepare_threshold = obj.get("PrepareThreshold", None)
+
+            new_server.post_connection_sql = obj.get("PostConnectionSQL", None)
 
             # if desktop mode or server mode with
             # ENABLE_SERVER_PASS_EXEC_CMD flag is True
@@ -968,3 +992,16 @@ def get_safe_post_logout_redirect():
         if url.startswith(item):
             return url
     return url_for('security.login')
+
+
+def check_extension_exists(conn, extension_name):
+    sql = f"SELECT * FROM pg_extension WHERE extname = '{extension_name}'"
+    status, res = conn.execute_scalar(sql)
+    if status:
+        if res:
+            return status, True
+        else:
+            return status, False
+    else:
+        # If the query fails, we assume the extension does not exist
+        return status, res

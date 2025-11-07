@@ -2,7 +2,7 @@
 #
 # pgAdmin 4 - PostgreSQL Tools
 #
-# Copyright (C) 2013 - 2024, The pgAdmin Development Team
+# Copyright (C) 2013 - 2025, The pgAdmin Development Team
 # This software is released under the PostgreSQL Licence
 #
 ##########################################################################
@@ -25,10 +25,11 @@ from config import PG_DEFAULT_DRIVER
 # This unused import is required as API test cases will fail if we remove it,
 # Have to identify the cause and then remove it.
 from pgadmin.model import Server, SharedServer
-from flask_security import current_user
+from flask_security import current_user, permissions_required
 from pgadmin.misc.bgprocess import escape_dquotes_process_arg
 from pgadmin.utils.constants import MIMETYPE_APP_JS, SERVER_NOT_FOUND
 from pgadmin.tools.grant_wizard import get_data
+from pgadmin.tools.user_management.PgAdminPermissions import AllPermissionTypes
 
 # set template path for sql scripts
 MODULE_NAME = 'backup'
@@ -180,19 +181,6 @@ class BackupMessage(IProcessDesc):
 @pga_login_required
 def index():
     return bad_request(errormsg=gettext("This URL cannot be called directly."))
-
-
-@blueprint.route("/backup.js")
-@pga_login_required
-def script():
-    """render own javascript"""
-    return Response(
-        response=render_template(
-            "backup/js/backup.js", _=_
-        ),
-        status=200,
-        mimetype=MIMETYPE_APP_JS
-    )
 
 
 def _get_args_params_values(data, conn, backup_obj_type, backup_file, server,
@@ -368,17 +356,17 @@ def _get_args_params_values(data, conn, backup_obj_type, backup_file, server,
     if 'objects' in data:
         selected_objects = data.get('objects', {})
         for _key in selected_objects:
-            param = 'schema' if _key == 'schema' else 'table'
+            selected_key = 'schema' if _key == 'schema' else 'table'
             args.extend(
                 functools.reduce(operator.iconcat, map(
-                    lambda s: [f'--{param}',
-                               r'{0}.{1}'.format(
-                                   driver.qtIdent(conn, s['schema']).replace(
-                                       '"', '\"'),
-                                   driver.qtIdent(conn, s['name']).replace(
-                                       '"', '\"')) if type(
-                                   s) is dict else driver.qtIdent(
-                                   conn, s).replace('"', '\"')],
+                    lambda s, param=selected_key:[
+                        f'--{param}',
+                        r'{0}.{1}'.format(
+                            driver.qtIdent(conn, s['schema']).
+                            replace('"', '\"'),
+                            driver.qtIdent(conn, s['name']).replace('"', '\"'))
+                        if type(s) is dict
+                        else driver.qtIdent(conn, s).replace('"', '\"')],
                     selected_objects[_key] or []), [])
             )
 
@@ -391,6 +379,7 @@ def _get_args_params_values(data, conn, backup_obj_type, backup_file, server,
 @blueprint.route(
     '/job/<int:sid>/object', methods=['POST'], endpoint='create_object_job'
 )
+@permissions_required(AllPermissionTypes.tools_backup)
 @pga_login_required
 def create_backup_objects_job(sid):
     """

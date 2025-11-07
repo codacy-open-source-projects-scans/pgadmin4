@@ -1,7 +1,7 @@
 #
 # pgAdmin 4 - PostgreSQL Tools
 #
-# Copyright (C) 2013 - 2024, The pgAdmin Development Team
+# Copyright (C) 2013 - 2025, The pgAdmin Development Team
 # This software is released under the PostgreSQL Licence
 #
 ##########################################################################
@@ -48,10 +48,10 @@ class NavMenuLocators:
 
     maintenance_obj_css = "li[data-label='Maintenance...']"
 
+    query_tool_menu_css = "li[data-label='Query Tool']"
+
     show_system_objects_pref_label_xpath = \
         "//label[contains(text(), 'Show system objects?')]"
-
-    maximize_pref_dialogue_css = "button[data-label='Maximize']"
 
     maximize_pref_dialogue_css = "button[data-label='Maximize']"
 
@@ -63,8 +63,10 @@ class NavMenuLocators:
 
     specified_sub_node_of_pref_tree_node = \
         "//*[@id='treeContainer']//div//span[text()='{1}']"
+
     insert_bracket_pair_switch_btn = \
-        "//label[text()='Insert bracket pairs?']//following::div[1]//span"
+        ("//div[label[text()='Insert bracket pairs?']]/"
+         "following-sibling::div//input")
 
     copy_sql_to_query_tool_switch_btn = \
         "//label[text()='Copy SQL from main window to query tool?']" \
@@ -108,6 +110,18 @@ class NavMenuLocators:
         "div[data-test='process-popup-end'] button[data-label='Close']"
     process_watcher_error_close_xpath = \
         ".btn.btn-sm-sq.btn-primary.pg-bg-close > i"
+
+
+class PreferencesLocaltors:
+    show_system_objects_pref_label_xpath = \
+        "//label[contains(text(), 'Show system objects?')]"
+
+    specified_preference_tree_node_xpath = \
+        ("//*[@id='treeContainer']//div[contains(@class,'PgTree-nodeLabel')]"
+         "[text()='{0}']")
+
+    save_btn = \
+        "#id-preferences button[data-label='Save']"
 
 
 class QueryToolLocators:
@@ -205,7 +219,7 @@ class QueryToolLocators:
     row_editor_text_area_css = "div[data-label='pg-editor'] textarea"
 
     json_editor_text_area_css = \
-        "div.ace_layer.ace_text-layer .ace_line_group .ace_line"
+        "div.jsoneditor-div .jse-contents .cm-editor .cm-content"
 
     row_editor_checkbox_css = "div[data-label='pg-checkbox-editor']"
 

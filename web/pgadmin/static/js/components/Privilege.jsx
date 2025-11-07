@@ -2,13 +2,12 @@
 //
 // pgAdmin 4 - PostgreSQL Tools
 //
-// Copyright (C) 2013 - 2024, The pgAdmin Development Team
+// Copyright (C) 2013 - 2025, The pgAdmin Development Team
 // This software is released under the PostgreSQL Licence
 //
 //////////////////////////////////////////////////////////////
 import { styled } from '@mui/material/styles';
 import _ from 'lodash';
-import React from 'react';
 import { InputCheckbox, InputText } from './FormComponents';
 import PropTypes from 'prop-types';
 
@@ -36,6 +35,8 @@ export default function Privilege({value, onChange, controlProps}) {
     'c': 'CONNECT',
     'a': 'INSERT',
     'r': 'SELECT',
+    'R': 'READ',
+    'W': 'WRITE',
     'w': 'UPDATE',
     'd': 'DELETE',
     'D': 'TRUNCATE',
@@ -43,6 +44,7 @@ export default function Privilege({value, onChange, controlProps}) {
     't': 'TRIGGER',
     'U': 'USAGE',
     'X': 'EXECUTE',
+    'm': 'MAINTAIN',
   };
   let all = false;
   let allWithGrant = false;

@@ -2,7 +2,7 @@
 //
 // pgAdmin 4 - PostgreSQL Tools
 //
-// Copyright (C) 2013 - 2024, The pgAdmin Development Team
+// Copyright (C) 2013 - 2025, The pgAdmin Development Team
 // This software is released under the PostgreSQL Licence
 //
 //////////////////////////////////////////////////////////////
@@ -66,11 +66,13 @@ define('pgadmin.node.trigger_function', [
           applies: ['object', 'context'], callback: 'show_obj_properties',
           category: 'create', priority: 4, label: gettext('Trigger function...'),
           data: {action: 'create', check: true}, enable: 'canCreate',
+          shortcut_preference: ['browser', 'sub_menu_create'],
         },{
           name: 'create_trigger_function', node: 'trigger_function', module: this,
           applies: ['object', 'context'], callback: 'show_obj_properties',
           category: 'create', priority: 4, label: gettext('Trigger function...'),
           data: {action: 'create', check: true}, enable: 'canCreate',
+          shortcut_preference: ['browser', 'sub_menu_create'],
         },{
           name: 'create_trigger_function', node: 'schema', module: this,
           applies: ['object', 'context'], callback: 'show_obj_properties',

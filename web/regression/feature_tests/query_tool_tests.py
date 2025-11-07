@@ -2,7 +2,7 @@
 #
 # pgAdmin 4 - PostgreSQL Tools
 #
-# Copyright (C) 2013 - 2024, The pgAdmin Development Team
+# Copyright (C) 2013 - 2025, The pgAdmin Development Team
 # This software is released under the PostgreSQL Licence
 #
 ##########################################################################
@@ -151,8 +151,7 @@ SELECT generate_series(1, {}) as id1, 'dummy' as id2""".format(
             {'page_info': '2001 to 2500', 'cell_rownum': '2001'}
         ]):
             page_info = self.page.find_by_css_selector(
-                QueryToolLocators.pagination_inputs +
-                f' span:nth-of-type(1)')
+                QueryToolLocators.pagination_inputs + ' span:nth-of-type(1)')
 
             self.assertEqual(page_info.text,
                              f"Showing rows: {page['page_info']}")
@@ -236,12 +235,25 @@ SELECT generate_series(1, 1000) as id order by id desc"""
 
         result = self.page.find_by_xpath(
             QueryToolLocators.output_cell_xpath.format(2, 2))
+        result.click()
+
+        copy_button = self.page.find_by_css_selector(
+            QueryToolLocators.copy_button_css)
+        copy_button.click()
+
+        scratch_pad_ele = self.page.find_by_css_selector(
+            QueryToolLocators.scratch_pad_css)
+        self.page.paste_values(scratch_pad_ele)
+
+        clipboard_text = scratch_pad_ele.get_attribute("value")
 
         # Search for 'Shared Read Blocks' word in result (buffers option)
-        self.assertIn('Shared Read Blocks', result.text)
+        self.assertIn('Shared Read Blocks', clipboard_text)
 
         # Search for 'Actual Total Time' word in result (timing option)
-        self.assertIn('Actual Total Time', result.text)
+        self.assertIn('Actual Total Time', clipboard_text)
+
+        scratch_pad_ele.clear()
 
     def _query_tool_auto_commit_disabled(self):
         table_name = 'query_tool_auto_commit_disabled_table'

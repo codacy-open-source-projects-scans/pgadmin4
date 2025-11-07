@@ -2,7 +2,7 @@
 //
 // pgAdmin 4 - PostgreSQL Tools
 //
-// Copyright (C) 2013 - 2024, The pgAdmin Development Team
+// Copyright (C) 2013 - 2025, The pgAdmin Development Team
 // This software is released under the PostgreSQL Licence
 //
 //////////////////////////////////////////////////////////////
@@ -402,7 +402,6 @@ export default class ForeignKeySchema extends BaseUISchema {
     },{
       id: 'confdeltype', label: gettext('On delete'),
       type:'select', group: gettext('Action'), mode: ['edit','create'],
-      select2:{allowClear: false},
       options: [
         {label: 'NO ACTION', value: 'a'},
         {label: 'RESTRICT', value: 'r'},

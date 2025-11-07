@@ -3,12 +3,11 @@
 //
 // pgAdmin 4 - PostgreSQL Tools
 //
-// Copyright (C) 2013 - 2024, The pgAdmin Development Team
+// Copyright (C) 2013 - 2025, The pgAdmin Development Team
 // This software is released under the PostgreSQL Licence
 //
 //////////////////////////////////////////////////////////////
 import gettext from 'sources/gettext';
-import React from 'react';
 import FileManager from './components/FileManager';
 import { getBrowser } from '../../../../static/js/utils';
 import pgAdmin from 'sources/pgadmin';
@@ -61,7 +60,9 @@ export default class FileManagerModule {
     if(!title) {
       if(params.dialog_type == 'create_file') {
         title = gettext('Save File');
-      } else if(params.dialog_type == 'select_file') {
+      } else if(params.dialog_type == 'open_file'){
+        title = gettext('Open File');
+      }else if(params.dialog_type == 'select_file') {
         title = gettext('Select File');
       } else {
         title = gettext('Storage Manager');
@@ -111,11 +112,11 @@ export default class FileManagerModule {
     }
   }
 
-  show(params, onOK, onCancel, modalObj) {
+  async show(params, onOK, onCancel, modalObj) {
     let {name: browser} = getBrowser();
     if(browser == 'Electron') {
       try {
-        this.showNative(params, onOK, onCancel);
+        await this.showNative(params, onOK, onCancel);
       } catch {
         // Fall back to internal
         this.showInternal(params, onOK, onCancel, modalObj);

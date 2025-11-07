@@ -2,7 +2,7 @@
 //
 // pgAdmin 4 - PostgreSQL Tools
 //
-// Copyright (C) 2013 - 2024, The pgAdmin Development Team
+// Copyright (C) 2013 - 2025, The pgAdmin Development Team
 // This software is released under the PostgreSQL Licence
 //
 //////////////////////////////////////////////////////////////
@@ -10,10 +10,10 @@
 import {getTableDialogSchema} from './TableDialog';
 import {getOneToManyDialogSchema} from './OneToManyDialog';
 import {getManyToManyDialogSchema} from './ManyToManyDialog';
+import {getOneToOneDialogSchema} from './OneToOneDialog';
 
 import pgAdmin from 'sources/pgadmin';
 import SchemaView from '../../../../../../static/js/SchemaView';
-import React from 'react';
 export default class ERDDialogs {
   constructor(modalProvider) {
     this.modal = modalProvider;
@@ -34,7 +34,7 @@ export default class ERDDialogs {
   showTableDialog(params) {
     let schema = getTableDialogSchema(
       params.attributes, params.isNew, params.tableNodes,
-      params.colTypes, params.schemas);
+      params.colTypes, params.schemas, params.geometryTypes);
     this.modal.showModal(params.title, (closeModal)=>{
       return (
         <SchemaView
@@ -67,6 +67,8 @@ export default class ERDDialogs {
       schema = getOneToManyDialogSchema(params.attributes, params.tableNodes);
     } else if(dialogName === 'manytomany_dialog') {
       schema = getManyToManyDialogSchema(params.attributes, params.tableNodes);
+    } else if(dialogName === 'onetoone_dialog') {
+      schema = getOneToOneDialogSchema(params.attributes, params.tableNodes);
     }
 
     this.modal.showModal(params.title, (closeModal)=>{

@@ -2,7 +2,7 @@
 //
 // pgAdmin 4 - PostgreSQL Tools
 //
-// Copyright (C) 2013 - 2024, The pgAdmin Development Team
+// Copyright (C) 2013 - 2025, The pgAdmin Development Team
 // This software is released under the PostgreSQL Licence
 //
 //////////////////////////////////////////////////////////////
@@ -120,6 +120,9 @@ export default function reactAspenOverride(theme) {
           'span.file-name': {
             color: theme.otherVars.tree.textHoverFg,
           },
+          'span.children-count': {
+            color: theme.otherVars.tree.textHoverFg
+          },
         },
       },
 
@@ -154,13 +157,19 @@ export default function reactAspenOverride(theme) {
         font: 'inherit',
         flexGrow: 1,
         userSelect: 'none',
-        color: theme.otherVars.tree.textFg,
         cursor: 'pointer !important',
         whiteSpace: 'nowrap',
         '&:hover, &.pseudo-active': {
           color: theme.otherVars.tree.fgHover,
         },
       },
+
+      'span.children-count': {
+        '&:hover, &.pseudo-active': {
+          color: theme.otherVars.tree.fgHover,
+        },
+      },
+
       'div.file-tag': {
         color: 'var(--tag-color)',
         border: '1px solid color-mix(in srgb, var(--tag-color) 90%, #fff)',

@@ -2,11 +2,12 @@
 //
 // pgAdmin 4 - PostgreSQL Tools
 //
-// Copyright (C) 2013 - 2024, The pgAdmin Development Team
+// Copyright (C) 2013 - 2025, The pgAdmin Development Team
 // This software is released under the PostgreSQL Licence
 //
 //////////////////////////////////////////////////////////////
 import getApiInstance from '../api_instance';
+import DownloadUtils from '../DownloadUtils';
 
 function convertImageURLtoDataURI(api, image) {
   return new Promise(function(resolve, reject) {
@@ -42,13 +43,6 @@ export function downloadSvg(svg, svgName) {
   }
 
   Promise.all(image_promises).then(function() {
-    let blob = new Blob([svgElement.outerHTML], {type: 'image/svg+xml'});
-    let svgURL = (window.URL || window.webkitURL).createObjectURL(blob);
-    let newElement = document.createElement('a');
-    newElement.href = svgURL;
-    newElement.setAttribute('download', svgName);
-    document.body.appendChild(newElement);
-    newElement.click();
-    document.body.removeChild(newElement);
+    DownloadUtils.downloadTextData(svgElement.outerHTML, svgName, 'image/svg+xml');
   });
 }

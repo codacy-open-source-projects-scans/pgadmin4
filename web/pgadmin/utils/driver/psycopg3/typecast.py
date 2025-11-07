@@ -2,7 +2,7 @@
 #
 # pgAdmin 4 - PostgreSQL Tools
 #
-# Copyright (C) 2013 - 2024, The pgAdmin Development Team
+# Copyright (C) 2013 - 2025, The pgAdmin Development Team
 # This software is released under the PostgreSQL Licence
 #
 ##########################################################################
@@ -20,6 +20,7 @@ from psycopg.types.net import InetLoader
 from psycopg.adapt import Loader
 from ipaddress import ip_address, ip_interface
 from psycopg._encodings import py_codecs as encodings
+from psycopg.pq import Format as _pq_Format
 
 configure_driver_encodings(encodings)
 
@@ -176,6 +177,12 @@ def register_binary_typecasters(connection):
     connection.adapters.register_loader(1001,
                                         ByteaLoader)
 
+    connection.adapters.register_loader(17,
+                                        ByteaBinaryLoader)
+
+    connection.adapters.register_loader(1001,
+                                        ByteaBinaryLoader)
+
 
 def register_array_to_string_typecasters(connection=None):
     type_array = PSYCOPG_SUPPORTED_BUILTIN_ARRAY_DATATYPES +\
@@ -212,6 +219,13 @@ class ByteaLoader(Loader):
         return 'binary data' if data is not None else None
 
 
+class ByteaBinaryLoader(Loader):
+    format = _pq_Format.BINARY
+
+    def load(self, data):
+        return 'binary data' if data is not None else None
+
+
 class TextLoaderpgAdmin(TextLoader):
     def load(self, data):
         postgres_encoding, python_encoding = get_encoding(
@@ -232,10 +246,12 @@ class TextLoaderpgAdmin(TextLoader):
                     return bytes(data).decode(python_encoding)
                 return data.decode(python_encoding)
             except Exception:
-                if isinstance(data, memoryview):
-                    return bytes(data).decode('UTF-8')
-                return data.decode('UTF-8')
-            else:
-                if isinstance(data, memoryview):
-                    return bytes(data).decode('ascii', errors='replace')
-                return data.decode('ascii', errors='replace')
+                try:
+                    if isinstance(data, memoryview):
+                        return bytes(data).decode('UTF-8')
+                    return data.decode('UTF-8')
+                except Exception:
+                    if isinstance(data, memoryview):
+                        return bytes(data).decode('ascii',
+                                                  errors='replace')
+                    return data.decode('ascii', errors='replace')

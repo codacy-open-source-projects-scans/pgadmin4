@@ -2,7 +2,7 @@
 #
 # pgAdmin 4 - PostgreSQL Tools
 #
-# Copyright (C) 2013 - 2024, The pgAdmin Development Team
+# Copyright (C) 2013 - 2025, The pgAdmin Development Team
 # This software is released under the PostgreSQL Licence
 #
 ##########################################################################
@@ -27,11 +27,15 @@ depends_on = None
 
 def upgrade():
     with (op.batch_alter_table("server",
-                               table_kwargs={'sqlite_autoincrement': True}) as batch_op):
+                               table_kwargs={'sqlite_autoincrement': True})
+          as batch_op):
         if context.get_impl().bind.dialect.name == "sqlite":
             batch_op.alter_column('id', autoincrement=True)
         batch_op.add_column(sa.Column('is_adhoc', sa.Integer(),
                                       server_default='0'))
+        batch_op.alter_column('tunnel_password',
+                              existing_type=sa.String(length=64),
+                              type_=sa.String())
 
 
 def downgrade():

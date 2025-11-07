@@ -2,11 +2,11 @@
 //
 // pgAdmin 4 - PostgreSQL Tools
 //
-// Copyright (C) 2013 - 2024, The pgAdmin Development Team
+// Copyright (C) 2013 - 2025, The pgAdmin Development Team
 // This software is released under the PostgreSQL Licence
 //
 //////////////////////////////////////////////////////////////
-import React, { useEffect, useMemo, useState, Fragment } from 'react';
+import { useEffect, useMemo, useState, Fragment } from 'react';
 import { styled } from '@mui/material/styles';
 import gettext from 'sources/gettext';
 import PropTypes from 'prop-types';
@@ -17,8 +17,8 @@ import url_for from 'sources/url_for';
 import Graphs from './Graphs';
 import { Box, Tab, Tabs } from '@mui/material';
 import { PgIconButton } from '../../../static/js/components/Buttons';
-import CancelIcon from '@mui/icons-material/Cancel';
-import StopSharpIcon from '@mui/icons-material/StopSharp';
+import BlockRoundedIcon from '@mui/icons-material/BlockRounded';
+import StopRoundedIcon from '@mui/icons-material/StopRounded';
 import WelcomeDashboard from './WelcomeDashboard';
 import ActiveQuery from './ActiveQuery.ui';
 import ServerLog from './ServerLog.ui';
@@ -40,7 +40,7 @@ import Replication from './Replication';
 import { getExpandCell } from '../../../static/js/components/PgReactTableStyled';
 import CodeMirror from '../../../static/js/components/ReactCodeMirror';
 import GetAppRoundedIcon from '@mui/icons-material/GetAppRounded';
-import { getBrowser } from '../../../static/js/utils';
+import DownloadUtils from '../../../static/js/DownloadUtils';
 import RefreshButton from './components/RefreshButtons';
 
 function parseData(data) {
@@ -81,9 +81,6 @@ const Root = styled('div')(({theme}) => ({
         height: '100%',
         display: 'flex',
         flexDirection: 'column',
-        '& .Dashboard-terminateButton': {
-          color: theme.palette.error.main
-        },
         '& .Dashboard-download': {
           '& .Dashboard-downloadButton': {
             width: '40px',
@@ -133,7 +130,7 @@ function getTerminateCell(pgAdmin, sid, did, canTakeAction, onSuccess) {
       <PgIconButton
         size="xs"
         noBorder
-        icon={<CancelIcon />}
+        icon={<BlockRoundedIcon />}
         className='Dashboard-terminateButton'
         onClick={() => {
           if (
@@ -196,9 +193,10 @@ function getCancelCell(pgAdmin, sid, did, canTakeAction, onSuccess) {
 
     return (
       <PgIconButton
-        size="xs"
+        size="md"
+        className='Buttons-dashBoardStopRound'
         noBorder
-        icon={<StopSharpIcon/>}
+        icon={<StopRoundedIcon/>}
         onClick={() => {
           if (!canTakeAction(row, 'cancel'))
             return;
@@ -272,8 +270,6 @@ function ActiveOnlyHeader({activeOnly, setActiveOnly}) {
 ActiveOnlyHeader.propTypes = {
   activeOnly: PropTypes.bool,
   setActiveOnly: PropTypes.func,
-  refresh: PropTypes.bool,
-  setRefresh: PropTypes.func,
 };
 
 function Dashboard({
@@ -455,22 +451,7 @@ function Dashboard({
     let fileName = 'data-' + new Date().getTime() + extension;
 
     try {
-      let respBlob = new Blob([respData], {type : 'text/'+type}),
-        urlCreator = window.URL || window.webkitURL,
-        download_url = urlCreator.createObjectURL(respBlob),
-        link = document.createElement('a');
-
-      document.body.appendChild(link);
-
-      if (getBrowser() == 'IE' && window.navigator.msSaveBlob) {
-        // IE10: (has Blob, but not a[download] or URL)
-        window.navigator.msSaveBlob(respBlob, fileName);
-      } else {
-        link.setAttribute('href', download_url);
-        link.setAttribute('download', fileName);
-        link.click();
-      }
-      document.body.removeChild(link);
+      DownloadUtils.downloadTextData(respData, fileName, `text/${type}`);
     } catch {
       setSsMsg(gettext('Failed to download the logs.'));
     }
@@ -533,7 +514,7 @@ function Dashboard({
       maxSize: 35,
       minSize: 35,
       id: 'btn-terminate',
-      cell: getTerminateCell(pgAdmin, sid, did, canTakeAction, setRefresh, ()=>setRefresh(!refresh)),
+      cell: getTerminateCell(pgAdmin, sid, did, canTakeAction, ()=>setRefresh(!refresh)),
     },
     {
       header: () => null,
@@ -544,7 +525,7 @@ function Dashboard({
       maxSize: 35,
       minSize: 35,
       id: 'btn-cancel',
-      cell: getCancelCell(pgAdmin, sid, did, canTakeAction, setRefresh, ()=>setRefresh(!refresh)),
+      cell: getCancelCell(pgAdmin, sid, did, canTakeAction, ()=>setRefresh(!refresh)),
     },
     {
       header: () => null,
@@ -886,7 +867,7 @@ function Dashboard({
             type: 'GET',
           })
             .then((res) => {
-              if (res.data && res.data['logs_disabled']) {
+              if (res?.data?.['logs_disabled']) {
                 setSsMsg(gettext('Please enable the logging to view the server logs or check the log file is in place or not.'));
               } else {
                 setDashData(parseData(res.data));
@@ -938,7 +919,7 @@ function Dashboard({
       // we want to show 'idle in transaction', 'active', 'active in transaction', and future non-blank, non-"idle" status values
       return dashData[0]['activity']?.filter((r)=>(r.state && r.state != '' && r.state != 'idle'));
     }
-    return dashData && dashData[0] && dashData[0]['activity'] || [];
+    return dashData?.[0]?.['activity'] || [];
   }, [dashData, activeOnly, mainTabVal]);
 
   const showDefaultContents = () => {
@@ -1083,30 +1064,30 @@ function Dashboard({
                 {!_.isUndefined(preferences) && preferences.show_activity && (
                   <Fragment>
                     <CustomRefresh refresh={refresh} setRefresh={setRefresh}/>
-                    <SectionContainer title={gettext('Sessions')} style={{height: 'auto', minHeight: '200px', maxHeight:'400px', paddingBottom: '20px'}}>
+                    <SectionContainer title={gettext('Sessions')}>
                       <PgTable
                         caveTable={false}
                         tableNoBorder={false}
                         customHeader={<ActiveOnlyHeader activeOnly={activeOnly} setActiveOnly={setActiveOnly} refresh={refresh} setRefresh={setRefresh}/>}
                         columns={activityColumns}
-                        data={(dashData !== undefined && dashData[0] && filteredDashData) || []}
+                        data={(dashData?.[0] && filteredDashData) || []}
                         schema={activeQSchemaObj}
                       ></PgTable>
                     </SectionContainer>
-                    <SectionContainer title={gettext('Locks')} style={{height: 'auto', minHeight: '200px',  maxHeight:'400px', paddingBottom: '20px'}}>
+                    <SectionContainer title={gettext('Locks')}>
                       <PgTable
                         caveTable={false}
                         tableNoBorder={false}
                         columns={databaseLocksColumns}
-                        data={(dashData !== undefined && dashData[0] && dashData[0]['locks']) || []}
+                        data={(dashData?.[0]?.['locks']) || []}
                       ></PgTable>
                     </SectionContainer>
-                    <SectionContainer title={gettext('Prepared Transactions')} style={{height: 'auto', minHeight: '200px',  maxHeight:'400px', paddingBottom: '20px'}}>
+                    <SectionContainer title={gettext('Prepared Transactions')}>
                       <PgTable
                         caveTable={false}
                         tableNoBorder={false}
                         columns={databasePreparedColumns}
-                        data={(dashData !== undefined &&  dashData[0] && dashData[0]['prepared']) || []}
+                        data={(dashData?.[0]?.['prepared']) || []}
                       ></PgTable>
                     </SectionContainer>
                   </Fragment>

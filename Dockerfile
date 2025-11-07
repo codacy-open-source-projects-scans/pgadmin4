@@ -2,7 +2,7 @@
 #
 # pgAdmin 4 - PostgreSQL Tools
 #
-# Copyright (C) 2013 - 2024, The pgAdmin Development Team
+# Copyright (C) 2013 - 2025, The pgAdmin Development Team
 # This software is released under the PostgreSQL Licence
 #
 #########################################################################
@@ -50,7 +50,7 @@ RUN export CPPFLAGS="-DPNG_ARM_NEON_OPT=0" && \
     npm install -g corepack && \
     corepack enable && \
     yarn set version berry && \
-    yarn set version 3 && \
+    yarn set version 4 && \
     yarn install && \
     yarn run bundle && \
     rm -rf node_modules \
@@ -120,21 +120,16 @@ RUN rm -rf /pgadmin4/docs/en_US/_build/html/_static/*.png
 # Create additional builders to get all of the PostgreSQL utilities
 #########################################################################
 
-FROM postgres:12-alpine AS pg12-builder
 FROM postgres:13-alpine AS pg13-builder
 FROM postgres:14-alpine AS pg14-builder
 FROM postgres:15-alpine AS pg15-builder
 FROM postgres:16-alpine AS pg16-builder
 FROM postgres:17-alpine AS pg17-builder
+FROM postgres:18-alpine AS pg18-builder
 
 FROM alpine:latest AS tool-builder
 
 # Copy the PG binaries
-COPY --from=pg12-builder /usr/local/bin/pg_dump /usr/local/pgsql/pgsql-12/
-COPY --from=pg12-builder /usr/local/bin/pg_dumpall /usr/local/pgsql/pgsql-12/
-COPY --from=pg12-builder /usr/local/bin/pg_restore /usr/local/pgsql/pgsql-12/
-COPY --from=pg12-builder /usr/local/bin/psql /usr/local/pgsql/pgsql-12/
-
 COPY --from=pg13-builder /usr/local/bin/pg_dump /usr/local/pgsql/pgsql-13/
 COPY --from=pg13-builder /usr/local/bin/pg_dumpall /usr/local/pgsql/pgsql-13/
 COPY --from=pg13-builder /usr/local/bin/pg_restore /usr/local/pgsql/pgsql-13/
@@ -160,6 +155,11 @@ COPY --from=pg17-builder /usr/local/bin/pg_dumpall /usr/local/pgsql/pgsql-17/
 COPY --from=pg17-builder /usr/local/bin/pg_restore /usr/local/pgsql/pgsql-17/
 COPY --from=pg17-builder /usr/local/bin/psql /usr/local/pgsql/pgsql-17/
 
+COPY --from=pg18-builder /usr/local/bin/pg_dump /usr/local/pgsql/pgsql-18/
+COPY --from=pg18-builder /usr/local/bin/pg_dumpall /usr/local/pgsql/pgsql-18/
+COPY --from=pg18-builder /usr/local/bin/pg_restore /usr/local/pgsql/pgsql-18/
+COPY --from=pg18-builder /usr/local/bin/psql /usr/local/pgsql/pgsql-18/
+
 #########################################################################
 # Assemble everything into the final container.
 #########################################################################
@@ -171,13 +171,13 @@ COPY --from=env-builder /venv /venv
 
 # Copy in the tools
 COPY --from=tool-builder /usr/local/pgsql /usr/local/
-COPY --from=pg17-builder /usr/local/lib/libpq.so.5.17 /usr/lib/
-COPY --from=pg17-builder /usr/lib/libzstd.so.1.5.6 /usr/lib/
-COPY --from=pg17-builder /usr/lib/liblz4.so.1.10.0 /usr/lib/
+COPY --from=pg18-builder /usr/local/lib/libpq.so.5.18 /usr/lib/
+COPY --from=pg18-builder /usr/lib/libzstd.so.1.5.7 /usr/lib/
+COPY --from=pg18-builder /usr/lib/liblz4.so.1.10.0 /usr/lib/
 
-RUN ln -s libpq.so.5.17 /usr/lib/libpq.so.5 && \
-    ln -s libpq.so.5.17 /usr/lib/libpq.so && \
-    ln -s libzstd.so.1.5.6 /usr/lib/libzstd.so.1 && \
+RUN ln -s libpq.so.5.18 /usr/lib/libpq.so.5 && \
+    ln -s libpq.so.5.18 /usr/lib/libpq.so && \
+    ln -s libzstd.so.1.5.7 /usr/lib/libzstd.so.1 && \
     ln -s liblz4.so.1.10.0 /usr/lib/liblz4.so.1
 
 WORKDIR /pgadmin4
@@ -192,7 +192,6 @@ COPY pkg/docker/entrypoint.sh /entrypoint.sh
 
 # License files
 COPY LICENSE /pgadmin4/LICENSE
-COPY DEPENDENCIES /pgadmin4/DEPENDENCIES
 
 # Install runtime dependencies and configure everything in one RUN step
 RUN apk add --no-cache \
@@ -208,7 +207,7 @@ RUN apk add --no-cache \
         libedit \
         libldap \
         libcap && \
-    /venv/bin/python3 -m pip install --no-cache-dir gunicorn==22.0.0 && \
+    /venv/bin/python3 -m pip install --no-cache-dir gunicorn==23.0.0 && \
     find / -type d -name '__pycache__' -exec rm -rf {} + && \
     useradd -r -u 5050 -g root -s /sbin/nologin pgadmin && \
     mkdir -p /run/pgadmin /var/lib/pgadmin && \
@@ -222,7 +221,7 @@ RUN apk add --no-cache \
     echo "pgadmin ALL = NOPASSWD: /usr/sbin/postfix start" > /etc/sudoers.d/postfix && \
     echo "pgadminr ALL = NOPASSWD: /usr/sbin/postfix start" >> /etc/sudoers.d/postfix
 
-USER pgadmin
+USER 5050
 
 # Finish up
 VOLUME /var/lib/pgadmin

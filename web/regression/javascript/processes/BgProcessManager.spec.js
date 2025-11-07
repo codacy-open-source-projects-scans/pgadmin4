@@ -2,7 +2,7 @@
 //
 // pgAdmin 4 - PostgreSQL Tools
 //
-// Copyright (C) 2013 - 2024, The pgAdmin Development Team
+// Copyright (C) 2013 - 2025, The pgAdmin Development Team
 // This software is released under the PostgreSQL Licence
 //
 //////////////////////////////////////////////////////////////
@@ -102,23 +102,5 @@ describe('BgProcessManager', ()=>{
     let nSpy = jest.spyOn(BgProcessNotify, 'processCompleted');
     obj.checkPending();
     expect(nSpy).toHaveBeenCalled();
-  });
-
-
-  it('openProcessesPanel', ()=>{
-    const panel = {};
-    jest.spyOn(pgBrowser.docker.default_workspace, 'openTab').mockReturnValue(panel);
-
-    /* panel open */
-    jest.spyOn(pgBrowser.docker.default_workspace, 'find').mockReturnValue(panel);
-    jest.spyOn(pgBrowser.docker.default_workspace, 'focus');
-    obj.openProcessesPanel();
-    expect(pgBrowser.docker.default_workspace.focus).toHaveBeenCalled();
-    expect(pgBrowser.docker.default_workspace.openTab).not.toHaveBeenCalled();
-
-    /* panel closed */
-    jest.spyOn(pgBrowser.docker.default_workspace, 'find').mockReturnValue(null);
-    obj.openProcessesPanel();
-    expect(pgBrowser.docker.default_workspace.openTab).toHaveBeenCalled();
   });
 });

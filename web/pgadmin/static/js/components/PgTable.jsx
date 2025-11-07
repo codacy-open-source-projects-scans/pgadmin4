@@ -2,7 +2,7 @@
 //
 // pgAdmin 4 - PostgreSQL Tools
 //
-// Copyright (C) 2013 - 2024, The pgAdmin Development Team
+// Copyright (C) 2013 - 2025, The pgAdmin Development Team
 // This software is released under the PostgreSQL Licence
 //
 //////////////////////////////////////////////////////////////
@@ -10,7 +10,7 @@
 import React, { useMemo, useRef } from 'react';
 import _ from 'lodash';
 
-import Box from '@mui/material/Box';
+import { Box } from '@mui/material';
 import { styled } from '@mui/material/styles';
 import {
   useReactTable,
@@ -37,6 +37,7 @@ import gettext from 'sources/gettext';
 import EmptyPanelMessage from './EmptyPanelMessage';
 import { InputText } from './FormComponents';
 import { PgReactTable, PgReactTableBody, PgReactTableCell, PgReactTableHeader, PgReactTableRow, PgReactTableRowContent, PgReactTableRowExpandContent, getCheckboxCell, getCheckboxHeaderCell } from './PgReactTableStyled';
+import SearchRoundedIcon from '@mui/icons-material/SearchRounded';
 
 
 const ROW_HEIGHT = 30;
@@ -66,7 +67,7 @@ function TableRow({index, style, schema, row, measureElement}) {
       </PgReactTableRowContent>
       <PgReactTableRowExpandContent row={row}>
         <FormView
-          accessPath={['data', index]}
+          accessPath={['data', row.index]}
           schema={schema}
           viewHelperProps={{ mode: 'properties' }}
         />
@@ -155,7 +156,7 @@ export function Table({
   // Render the UI for your table
   const tableRef = useRef();
   let flatData = [];
-  let fetchMoreOnBottomReached = undefined;
+  let fetchMoreOnBottomReached;
   let totalFetched = 0;
   let totalDBRowCount = 0;
 
@@ -334,6 +335,7 @@ export default function PgTable({ caveTable = true, tableNoBorder = true, tableN
               onChange={(val) => {
                 setSearchVal(val);
               }}
+              startAdornment={<SearchRoundedIcon />}
             />
           </Box>
         </Box>}

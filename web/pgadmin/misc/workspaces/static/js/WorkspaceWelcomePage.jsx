@@ -2,12 +2,11 @@
 //
 // pgAdmin 4 - PostgreSQL Tools
 //
-// Copyright (C) 2013 - 2024, The pgAdmin Development Team
+// Copyright (C) 2013 - 2025, The pgAdmin Development Team
 // This software is released under the PostgreSQL Licence
 //
 //////////////////////////////////////////////////////////////
 
-import React from 'react';
 import { styled } from '@mui/material/styles';
 import gettext from 'sources/gettext';
 import PropTypes from 'prop-types';
@@ -17,6 +16,7 @@ import WelcomeBG from '../img/welcome_background.svg?svgr';
 import { QueryToolIcon } from '../../../../static/js/components/ExternalIcon';
 import TerminalRoundedIcon from '@mui/icons-material/TerminalRounded';
 import { renderToStaticMarkup } from 'react-dom/server';
+import { WORKSPACES } from '../../../../browser/static/js/constants';
 
 const welcomeBackgroundString = encodeURIComponent(renderToStaticMarkup(<WelcomeBG />));
 const welcomeBackgroundURI = `url("data:image/svg+xml,${welcomeBackgroundString}")`;
@@ -91,7 +91,7 @@ export default function WorkspaceWelcomePage({ mode }) {
   let welcomeFirst = gettext('The Query Tool is a robust and versatile environment designed for executing SQL commands and reviewing result sets efficiently.');
   let welcomeSecond = gettext('In this workspace, you can seamlessly open and manage multiple query tabs, making it easier to organize your work. You can select the existing servers or create a completely new ad-hoc connection to any database server as needed.');
 
-  if (mode == 'PSQL') {
+  if (mode == WORKSPACES.PSQL_TOOL) {
     welcomeIcon = <TerminalRoundedIcon style={{height: '2rem', width: 'unset'}} />;
     welcomeTitle = gettext('Welcome to the PSQL Workspace!');
     welcomeFirst = gettext('The PSQL tool allows users to connect to PostgreSQL or EDB Advanced server using the psql command line interface.');

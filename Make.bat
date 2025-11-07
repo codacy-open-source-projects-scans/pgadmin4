@@ -28,7 +28,7 @@ CALL :CREATE_PYTHON_ENV || EXIT /B 1
 CALL :CREATE_RUNTIME_ENV || EXIT /B 1
 CALL :GENERATE_SBOM || EXIT /B 1
 CALL :CREATE_INSTALLER || EXIT /B 1
-CALL :SIGN_INSTALLER || EXIT /B 1
+CALL :VERIFY_SIGNATURE || EXIT /B 1
 
 EXIT /B %ERRORLEVEL%
 REM Main build sequence Ends
@@ -52,7 +52,7 @@ REM Main build sequence Ends
 
 :SET_ENVIRONMENT
     ECHO Configuring the environment...
-    IF "%PGADMIN_PYTHON_DIR%" == ""   SET "PGADMIN_PYTHON_DIR=C:\Python312"
+    IF "%PGADMIN_PYTHON_DIR%" == ""   SET "PGADMIN_PYTHON_DIR=C:\Python313"
     IF "%PGADMIN_KRB5_DIR%" == ""     SET "PGADMIN_KRB5_DIR=C:\Program Files\MIT\Kerberos"
     IF "%PGADMIN_POSTGRES_DIR%" == "" SET "PGADMIN_POSTGRES_DIR=C:\Program Files\PostgreSQL\17"
     IF "%PGADMIN_INNOTOOL_DIR%" == "" SET "PGADMIN_INNOTOOL_DIR=C:\Program Files (x86)\Inno Setup 6"
@@ -216,7 +216,7 @@ REM Main build sequence Ends
     ECHO Installing javascript dependencies...
     CD "%BUILDROOT%\web"
     CALL yarn set version berry || EXIT /B 1
-    CALL yarn set version 3 || EXIT /B 1
+    CALL yarn set version 4 || EXIT /B 1
     CALL yarn install || EXIT /B 1
     CALL npm rebuild || EXIT /B 1
 
@@ -239,7 +239,6 @@ REM Main build sequence Ends
 
     ECHO Staging license files...
     COPY "%WD%\LICENSE" "%BUILDROOT%\" > nul || EXIT /B 1
-    COPY "%WD%\DEPENDENCIES" "%BUILDROOT%\" > nul || EXIT /B 1
 
     ECHO Creating config_distro.py
     ECHO SERVER_MODE = False > "%BUILDROOT%\web\config_distro.py"
@@ -272,8 +271,7 @@ REM Main build sequence Ends
     CD "%BUILDROOT%\runtime\resources\app\"
 
     CALL yarn set version berry || EXIT /B 1
-    CALL yarn set version 3 || EXIT /B 1
-    CALL yarn plugin import workspace-tools || EXIT /B 1
+    CALL yarn set version 4 || EXIT /B 1
     CALL yarn workspaces focus --production || EXIT /B 1
 
     ECHO Removing yarn cache...
@@ -284,6 +282,7 @@ REM Main build sequence Ends
 
     REM WGET
     FOR /f "tokens=*" %%i IN ('npm info electron version') DO SET "ELECTRON_VERSION=%%i"
+
     :GET_NW
         wget https://github.com/electron/electron/releases/download/v%ELECTRON_VERSION%/electron-v%ELECTRON_VERSION%-win32-x64.zip -O "%TMPDIR%\electron-v%ELECTRON_VERSION%-win32-x64.zip"
         IF %ERRORLEVEL% NEQ 0 GOTO GET_NW
@@ -357,7 +356,7 @@ REM Main build sequence Ends
     DEL /s "%WD%\pkg\win32\installer.iss.in_stage*" > nul
 
     ECHO Creating windows installer using INNO tool...
-    CALL "%PGADMIN_INNOTOOL_DIR%\ISCC.exe" "%WD%\pkg\win32\installer.iss" || EXIT /B 1
+    CALL "%PGADMIN_INNOTOOL_DIR%\ISCC.exe" "%WD%\pkg\win32\installer.iss" "/SpgAdminSigntool=%PGADMIN_SIGNTOOL_DIR%\signtool.exe sign /fd certHash /tr http://timestamp.digicert.com /td SHA256 $f" || EXIT /B 1
 
     ECHO Renaming installer...
     MOVE "%WD%\pkg\win32\Output\pgadmin4-setup.exe" "%DISTROOT%\%INSTALLERNAME%" > nul || EXIT /B 1
@@ -374,13 +373,14 @@ REM Main build sequence Ends
 
     EXIT /B 0
 
-:SIGN_INSTALLER
-    ECHO Attempting to sign the installer...
-    CALL "%PGADMIN_SIGNTOOL_DIR%\signtool.exe" sign /fd certHash /tr http://timestamp.digicert.com /td SHA256 "%DISTROOT%\%INSTALLERNAME%"
+:VERIFY_SIGNATURE
+    ECHO Verifying the installer signature...
+
+    CALL "%PGADMIN_SIGNTOOL_DIR%\signtool.exe" verify /pa /v "%DISTROOT%\%INSTALLERNAME%"
     IF %ERRORLEVEL% NEQ 0 (
         ECHO.
         ECHO ************************************************************
-        ECHO * Failed to sign the installer
+        ECHO * Failed to verify signature of the installer
         ECHO ************************************************************
         PAUSE
     )

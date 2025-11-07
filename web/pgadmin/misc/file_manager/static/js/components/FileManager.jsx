@@ -2,7 +2,7 @@
 //
 // pgAdmin 4 - PostgreSQL Tools
 //
-// Copyright (C) 2013 - 2024, The pgAdmin Development Team
+// Copyright (C) 2013 - 2025, The pgAdmin Development Team
 // This software is released under the PostgreSQL Licence
 //
 //////////////////////////////////////////////////////////////
@@ -32,7 +32,7 @@ import Uploader from './Uploader';
 import GridView from './GridView';
 import convert from 'convert-units';
 import PropTypes from 'prop-types';
-import { downloadBlob } from '../../../../../static/js/utils';
+import DownloadUtils from '../../../../../static/js/DownloadUtils';
 import ErrorBoundary from '../../../../../static/js/helpers/ErrorBoundary';
 import { MY_STORAGE } from './FileManagerConstants';
 import _ from 'lodash';
@@ -160,6 +160,10 @@ export class FileManagerUtils {
     this.currPath = '';
     this.separator = '/';
     this.storage_folder = '';
+  }
+
+  setModalObj(obj){
+    this.params.modal = obj;
   }
 
   get transId() {
@@ -311,7 +315,7 @@ export class FileManagerUtils {
         'storage_folder': ss,
       },
     });
-    downloadBlob(res.data, res.headers.filename);
+    DownloadUtils.downloadBlob(res.data, res.headers.filename);
   }
 
   setDialogView(view) {
@@ -388,6 +392,61 @@ export class FileManagerUtils {
     return ret;
   }
 
+  warnFileReload (fileName, toolContent) {
+    return new Promise((resolve) => {
+      this.params.modal.confirm(
+        gettext('Reload file?'),
+        gettext('The file has been modified by another program. Do you want to reload it and lose changes made in pgAdmin?'),
+        function () {
+          resolve({
+            loadFile: true,
+            data: null,
+            fileName: fileName,
+          });
+        },
+        function () {
+          resolve({
+            loadFile: false,
+            data: toolContent,
+            fileName: fileName
+          });
+        }
+      );
+    });
+  };
+
+  async loadFile(fileName){
+    try{
+      const res =  await this.api.post(url_for('file_manager.load_file'), {
+        'file_name': decodeURI(fileName)
+      }, {transformResponse: [(data, headers) => {
+        if(headers['content-type'].includes('application/json')) {
+          return JSON.parse(data);
+        }
+        return data;
+      }]});
+      if (res && res.status === 200) {
+        return {
+          success: true,
+          data: res.data,
+          error: null,
+        };
+      } else {
+        return {
+          success: false,
+          data: null,
+          error: res.data || 'Unknown error while loading file.',
+        };
+      }
+    } catch (err) {
+      return {
+        success: false,
+        data: null,
+        error: err.message || err,
+      };
+    }
+  }
+
 }
 
 function ConfirmFile({text, onYes, onNo}) {
@@ -439,21 +498,23 @@ export default function FileManager({params, closeModal, onOK, onCancel, sharedS
     type: null, idx: null
   });
 
+  // apply sort
   const sortedItems = useMemo(()=>(
     [...items].sort(getComparator(sortColumns[0]))
   ), [items, sortColumns]);
 
-  const filteredItems = useMemo(()=>{
+  // apply filter on sorted
+  const finalItems = useMemo(()=>{
     return sortedItems.filter((i)=>i.Filename?.toLowerCase().includes(search?.toLocaleLowerCase()));
   }, [items, sortColumns, search]);
 
   const itemsText = useMemo(()=>{
     let suffix = items.length == 1 ? 'item' : 'items';
-    if(items.length == filteredItems.length) {
+    if(items.length == finalItems.length) {
       return `${items.length} ${suffix}`;
     }
-    return `${filteredItems.length} of ${items.length} ${suffix}`;
-  }, [items, filteredItems]);
+    return `${finalItems.length} of ${items.length} ${suffix}`;
+  }, [items, finalItems]);
 
   const changeDir = async(storage) => {
     setSelectedSS(storage);
@@ -478,7 +539,9 @@ export default function FileManager({params, closeModal, onOK, onCancel, sharedS
     setLoaderText('');
   };
 
-  const completeOperation = async (oldRow, newRow, rowIdx, selectedSS, func)=>{
+  const completeOperation = async (oldRow, newRow, selectedSS, func)=>{
+    // We need to find the index in actual items list not final items list
+    const rowIdx = oldRow ? items.findIndex((i)=>i.Filename == oldRow?.Filename && i.Path == oldRow?.Path) : 0;
     setOperation({});
     if(oldRow?.Filename == newRow.Filename) {
       setItems((prev)=>[
@@ -519,7 +582,7 @@ export default function FileManager({params, closeModal, onOK, onCancel, sharedS
   const onDownload = async ()=>{
     setLoaderText('Downloading...');
     try {
-      await fmUtilsObj.downloadFile(filteredItems[selectedRowIdx.current], selectedSS);
+      await fmUtilsObj.downloadFile(finalItems[selectedRowIdx.current], selectedSS);
     } catch (error) {
       setErrorMsg(parseApiError(error));
       console.error(error);
@@ -534,10 +597,10 @@ export default function FileManager({params, closeModal, onOK, onCancel, sharedS
     setOperation({
       type: 'add',
       idx: 0,
-      onComplete: async (row, rowIdx)=>{
+      onComplete: async (row)=>{
         setErrorMsg('');
         setLoaderText('Creating folder...');
-        await completeOperation(null, row, rowIdx, selectedSS, fmUtilsObj.addFolder.bind(fmUtilsObj));
+        await completeOperation(null, row, selectedSS, fmUtilsObj.addFolder.bind(fmUtilsObj));
         setLoaderText('');
       }
     });
@@ -554,8 +617,8 @@ export default function FileManager({params, closeModal, onOK, onCancel, sharedS
       onComplete: async (row, rowIdx)=>{
         setErrorMsg('');
         setLoaderText('Renaming...');
-        let oldRow = items[rowIdx];
-        await completeOperation(oldRow, row, rowIdx, selectedSS,fmUtilsObj.renameItem.bind(fmUtilsObj));
+        let oldRow = finalItems[rowIdx];
+        await completeOperation(oldRow, row, selectedSS, fmUtilsObj.renameItem.bind(fmUtilsObj));
         setLoaderText('');
       }
     });
@@ -570,10 +633,14 @@ export default function FileManager({params, closeModal, onOK, onCancel, sharedS
       setConfirmFile([null, null]);
       setLoaderText('Deleting...');
       try {
-        await fmUtilsObj.deleteItem(items[selectedRowIdx.current],selectedSS);
+        // selectedRowIdx is index in finalItems, so we need to find the index in actual items list
+        const oldRow = finalItems[selectedRowIdx.current];
+        const itemsRowIdx = items.findIndex((i)=>i.Filename == oldRow?.Filename && i.Path == oldRow?.Path);
+
+        await fmUtilsObj.deleteItem(oldRow, selectedSS);
         setItems((prev)=>[
-          ...prev.slice(0, selectedRowIdx.current),
-          ...prev.slice(selectedRowIdx.current+1),
+          ...prev.slice(0, itemsRowIdx),
+          ...prev.slice(itemsRowIdx+1),
         ]);
       } catch (error) {
         setErrorMsg(parseApiError(error));
@@ -613,39 +680,40 @@ export default function FileManager({params, closeModal, onOK, onCancel, sharedS
         }]);
         return;
       }
-    } else if(selectedRowIdx?.current >= 0 && filteredItems[selectedRowIdx?.current]) {
-      onOkPath = filteredItems[selectedRowIdx?.current]['Path'];
+    } else if(selectedRowIdx?.current >= 0 && finalItems[selectedRowIdx?.current]) {
+      onOkPath = finalItems[selectedRowIdx?.current]['Path'];
     }
     await fmUtilsObj.setLastVisitedDir(fmUtilsObj.currPath, selectedSS);
     onOK?.(onOkPath, selectedSS);
     closeModal();
-  }, [filteredItems, saveAs, fileType]);
+  }, [finalItems, saveAs, fileType]);
   const onItemEnter = useCallback(async (row)=>{
     if(row.file_type == 'dir' || row.file_type == 'drive') {
       await openDir(row.Path, selectedSS);
     } else if(params.dialog_type == 'select_file') {
       onOkClick();
     }
-  }, [filteredItems]);
+  }, [finalItems]);
   const onItemSelect = useCallback((idx)=>{
     selectedRowIdx.current = idx;
     fewBtnDisableCheck();
-  }, [filteredItems]);
+  }, [finalItems]);
   const onItemClick = useCallback((idx)=>{
-    let row = filteredItems[selectedRowIdx.current];
+    let row = finalItems[selectedRowIdx.current];
     if(params.dialog_type == 'create_file' && row?.file_type != 'dir' && row?.file_type != 'drive') {
-      setSaveAs(filteredItems[idx]?.Filename);
+      setSaveAs(finalItems[idx]?.Filename);
     }
-  }, [filteredItems]);
+  }, [finalItems]);
   const fewBtnDisableCheck = ()=>{
     let disabled = true;
-    let row = filteredItems[selectedRowIdx.current];
+    let row = finalItems[selectedRowIdx.current];
     if(params.dialog_type == 'create_file') {
       disabled = !saveAs?.trim();
     } else if(selectedRowIdx.current >= 0 && row) {
       let selectedfileType = row?.file_type;
       if(((selectedfileType == 'dir' || selectedfileType == 'drive') && fmUtilsObj.hasCapability('select_folder'))
-      || (selectedfileType != 'dir' && selectedfileType != 'drive' && fmUtilsObj.hasCapability('select_file'))) {
+      || (selectedfileType != 'dir' && selectedfileType != 'drive' && fmUtilsObj.hasCapability('select_file'))
+      || (selectedfileType != 'dir' && selectedfileType != 'drive' && fmUtilsObj.hasCapability('open_file'))) {
         disabled = false;
       }
     }
@@ -687,7 +755,7 @@ export default function FileManager({params, closeModal, onOK, onCancel, sharedS
 
   useEffect(()=>{
     fewBtnDisableCheck();
-  }, [saveAs, filteredItems.length]);
+  }, [saveAs, finalItems.length]);
 
   const isNoneSelected = _.isUndefined(selectedRow);
   let okBtnText = params.btn_primary;
@@ -695,6 +763,8 @@ export default function FileManager({params, closeModal, onOK, onCancel, sharedS
     okBtnText = gettext('Select');
     if(params.dialog_type == 'create_file' || params.dialog_type == 'create_folder') {
       okBtnText = gettext('Create');
+    }else if(params.dialog_type == 'open_file'){
+      okBtnText = gettext('Open');
     }
   }
 
@@ -722,7 +792,7 @@ export default function FileManager({params, closeModal, onOK, onCancel, sharedS
                 onKeyDown={async (e)=>{
                   if(e.code === 'Enter') {
                     e.preventDefault();
-                    await openDir(path);
+                    await openDir(path, selectedSS);
                   }
                 }} value={path} onChange={setPath} readonly={showUploader} />
 
@@ -809,10 +879,10 @@ export default function FileManager({params, closeModal, onOK, onCancel, sharedS
                   }
                 }}/>}
             {viewMode == 'list' &&
-            <ListView key={fmUtilsObj.currPath} items={filteredItems} operation={operation} onItemEnter={onItemEnter}
+            <ListView key={fmUtilsObj.currPath} items={finalItems} operation={operation} onItemEnter={onItemEnter}
               onItemSelect={onItemSelect} onItemClick={onItemClick} sortColumns={sortColumns} onSortColumnsChange={setSortColumns}/>}
             {viewMode == 'grid' &&
-            <GridView key={fmUtilsObj.currPath} items={filteredItems} operation={operation} onItemEnter={onItemEnter}
+            <GridView key={fmUtilsObj.currPath} items={finalItems} operation={operation} onItemEnter={onItemEnter}
               onItemSelect={onItemSelect} />}
             <FormFooterMessage type={MESSAGE_TYPE.ERROR} message={_.escape(errorMsg)} closable onClose={()=>setErrorMsg('')}  />
             {params.dialog_type == 'create_file' &&

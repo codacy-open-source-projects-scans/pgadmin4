@@ -48,7 +48,8 @@ CA_FILE = '/etc/ssl/certs/ca-certificates.crt'
 LOG_FILE = '/dev/null'
 HELP_PATH = '../../docs'
 DEFAULT_BINARY_PATHS = {
-        'pg': '/usr/local/pgsql-17',
+        'pg': '/usr/local/pgsql-18',
+        'pg-18': '/usr/local/pgsql-18',
         'pg-17': '/usr/local/pgsql-17',
         'pg-16': '/usr/local/pgsql-16',
         'pg-15': '/usr/local/pgsql-15',
@@ -72,6 +73,27 @@ if [ -n "${PGADMIN_CONFIG_CONFIG_DATABASE_URI}" ]; then
      external_config_db_exists=$(cd /pgadmin4/pgadmin/utils && /venv/bin/python3 -c "from check_external_config_db import check_external_config_db; val = check_external_config_db("${PGADMIN_CONFIG_CONFIG_DATABASE_URI}"); print(val)")
 fi
 
+# DRY of the code to load the PGADMIN_SERVER_JSON_FILE
+function load_server_json_file() {
+    export PGADMIN_SERVER_JSON_FILE="${PGADMIN_SERVER_JSON_FILE:-/pgadmin4/servers.json}"
+
+    EXTRA_ARGS=""
+
+    if [ "${PGADMIN_REPLACE_SERVERS_ON_STARTUP}" = "True" ]; then
+        EXTRA_ARGS="--replace"
+    fi
+
+    if [ -f "${PGADMIN_SERVER_JSON_FILE}" ]; then
+        # When running in Desktop mode, no user is created
+        # so we have to import servers anonymously
+        if [ "${PGADMIN_CONFIG_SERVER_MODE}" = "False" ]; then
+            /venv/bin/python3 /pgadmin4/setup.py load-servers "${PGADMIN_SERVER_JSON_FILE}" ${EXTRA_ARGS}
+        else
+            /venv/bin/python3 /pgadmin4/setup.py load-servers "${PGADMIN_SERVER_JSON_FILE}" --user "${PGADMIN_DEFAULT_EMAIL}" ${EXTRA_ARGS}
+        fi
+    fi
+}
+
 if [ ! -f /var/lib/pgadmin/pgadmin4.db ] && [ "${external_config_db_exists}" = "False" ]; then
     if [ -z "${PGADMIN_DEFAULT_EMAIL}" ] || { [ -z "${PGADMIN_DEFAULT_PASSWORD}" ] && [ -z "${PGADMIN_DEFAULT_PASSWORD_FILE}" ]; }; then
         echo 'You need to define the PGADMIN_DEFAULT_EMAIL and PGADMIN_DEFAULT_PASSWORD or PGADMIN_DEFAULT_PASSWORD_FILE environment variables.'
@@ -87,11 +109,16 @@ if [ ! -f /var/lib/pgadmin/pgadmin4.db ] && [ "${external_config_db_exists}" = "
     if [ -n "${PGADMIN_CONFIG_ALLOW_SPECIAL_EMAIL_DOMAINS}" ]; then
         ALLOW_SPECIAL_EMAIL_DOMAINS=${PGADMIN_CONFIG_ALLOW_SPECIAL_EMAIL_DOMAINS}
     fi
-     email_config="{'CHECK_EMAIL_DELIVERABILITY': ${CHECK_EMAIL_DELIVERABILITY}, 'ALLOW_SPECIAL_EMAIL_DOMAINS': ${ALLOW_SPECIAL_EMAIL_DOMAINS}}"
-    echo "email config is ${email_config}"
+    GLOBALLY_DELIVERABLE="True"
+    if [ -n "${PGADMIN_CONFIG_GLOBALLY_DELIVERABLE}" ]; then
+        GLOBALLY_DELIVERABLE=${PGADMIN_CONFIG_GLOBALLY_DELIVERABLE}
+    fi
+     email_config="{'CHECK_EMAIL_DELIVERABILITY': ${CHECK_EMAIL_DELIVERABILITY}, 'ALLOW_SPECIAL_EMAIL_DOMAINS': ${ALLOW_SPECIAL_EMAIL_DOMAINS}, 'GLOBALLY_DELIVERABLE': ${GLOBALLY_DELIVERABLE}}"
+     echo "email config is ${email_config}"
      is_valid_email=$(cd /pgadmin4/pgadmin/utils && /venv/bin/python3 -c "from validation_utils import validate_email; val = validate_email('${PGADMIN_DEFAULT_EMAIL}', ${email_config}); print(val)")
      if echo "${is_valid_email}" | grep "False" > /dev/null; then
          echo "'${PGADMIN_DEFAULT_EMAIL}' does not appear to be a valid email address. Please reset the PGADMIN_DEFAULT_EMAIL environment variable and try again."
+         echo "Validation output: ${is_valid_email}"
          exit 1
      fi
     # Switch back to root directory for further process
@@ -106,19 +133,11 @@ if [ ! -f /var/lib/pgadmin/pgadmin4.db ] && [ "${external_config_db_exists}" = "
     # Importing pgadmin4 (from this script) is enough
     /venv/bin/python3 run_pgadmin.py
 
-    export PGADMIN_SERVER_JSON_FILE="${PGADMIN_SERVER_JSON_FILE:-/pgadmin4/servers.json}"
     export PGADMIN_PREFERENCES_JSON_FILE="${PGADMIN_PREFERENCES_JSON_FILE:-/pgadmin4/preferences.json}"
 
     # Pre-load any required servers
-    if [ -f "${PGADMIN_SERVER_JSON_FILE}" ]; then
-        # When running in Desktop mode, no user is created
-        # so we have to import servers anonymously
-        if [ "${PGADMIN_CONFIG_SERVER_MODE}" = "False" ]; then
-            /venv/bin/python3 /pgadmin4/setup.py load-servers "${PGADMIN_SERVER_JSON_FILE}"
-        else
-            /venv/bin/python3 /pgadmin4/setup.py load-servers "${PGADMIN_SERVER_JSON_FILE}" --user "${PGADMIN_DEFAULT_EMAIL}"
-        fi
-    fi
+    load_server_json_file
+
     # Pre-load any required preferences
     if [ -f "${PGADMIN_PREFERENCES_JSON_FILE}" ]; then
         if [ "${PGADMIN_CONFIG_SERVER_MODE}" = "False" ]; then
@@ -140,7 +159,9 @@ if [ ! -f /var/lib/pgadmin/pgadmin4.db ] && [ "${external_config_db_exists}" = "
             chmod 600 /var/lib/pgadmin/storage/${PGADMIN_USER_CONFIG_DIR}/.pgpass
         fi
     fi
-
+# If already initialised and PGADMIN_REPLACE_SERVERS_ON_STARTUP is set to true, then load the server json file.
+elif [ "${PGADMIN_REPLACE_SERVERS_ON_STARTUP}" = "True" ]; then
+    load_server_json_file
 fi
 
 # Start Postfix to handle password resets etc.
@@ -168,5 +189,5 @@ fi
 if [ -n "${PGADMIN_ENABLE_TLS}" ]; then
     exec /venv/bin/gunicorn --limit-request-line "${GUNICORN_LIMIT_REQUEST_LINE:-8190}" --timeout "${TIMEOUT}" --bind "${BIND_ADDRESS}" -w 1 --threads "${GUNICORN_THREADS:-25}" --access-logfile "${GUNICORN_ACCESS_LOGFILE:--}" --keyfile /certs/server.key --certfile /certs/server.cert -c gunicorn_config.py run_pgadmin:app
 else
-    exec /venv/bin/gunicorn --limit-request-line "${GUNICORN_LIMIT_REQUEST_LINE:-8190}" --timeout "${TIMEOUT}" --bind "${BIND_ADDRESS}" -w 1 --threads "${GUNICORN_THREADS:-25}" --access-logfile "${GUNICORN_ACCESS_LOGFILE:--}" -c gunicorn_config.py run_pgadmin:app
+    exec /venv/bin/gunicorn --limit-request-line "${GUNICORN_LIMIT_REQUEST_LINE:-8190}" --limit-request-fields "${GUNICORN_LIMIT_REQUEST_FIELDS:-100}" --limit-request-field_size "${GUNICORN_LIMIT_REQUEST_FIELD_SIZE:-8190}" --timeout "${TIMEOUT}" --bind "${BIND_ADDRESS}" -w 1 --threads "${GUNICORN_THREADS:-25}" --access-logfile "${GUNICORN_ACCESS_LOGFILE:--}" -c gunicorn_config.py run_pgadmin:app
 fi

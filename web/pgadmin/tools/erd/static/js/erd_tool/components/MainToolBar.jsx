@@ -2,7 +2,7 @@
 //
 // pgAdmin 4 - PostgreSQL Tools
 //
-// Copyright (C) 2013 - 2024, The pgAdmin Development Team
+// Copyright (C) 2013 - 2025, The pgAdmin Development Team
 // This software is released under the PostgreSQL Licence
 //
 //////////////////////////////////////////////////////////////
@@ -28,6 +28,7 @@ import ImageRoundedIcon from '@mui/icons-material/ImageRounded';
 import FormatColorFillRoundedIcon from '@mui/icons-material/FormatColorFillRounded';
 import FormatColorTextRoundedIcon from '@mui/icons-material/FormatColorTextRounded';
 import AccountTreeOutlinedIcon from '@mui/icons-material/AccountTreeOutlined';
+import SearchOutlinedIcon from '@mui/icons-material/SearchOutlined';
 
 import { PgMenu, PgMenuItem, usePgMenuGroup } from '../../../../../../static/js/components/Menu';
 import gettext from 'sources/gettext';
@@ -37,6 +38,8 @@ import { ERD_EVENTS } from '../ERDConstants';
 import { MagicIcon, SQLFileIcon } from '../../../../../../static/js/components/ExternalIcon';
 import { useModal } from '../../../../../../static/js/helpers/ModalProvider';
 import { withColorPicker } from '../../../../../../static/js/helpers/withColorPicker';
+import { useApplicationState } from '../../../../../../settings/static/ApplicationStateProvider';
+import { useDelayDebounce } from '../../../../../../static/js/custom_hooks';
 
 const StyledBox = styled(Box)(({theme}) => ({
   padding: '2px 4px',
@@ -48,12 +51,13 @@ const StyledBox = styled(Box)(({theme}) => ({
   ...theme.mixins.panelBorder.bottom,
 }));
 
-export function MainToolBar({preferences, eventBus, fillColor, textColor, notation, onNotationChange}) {
+export function MainToolBar({preferences, eventBus, fillColor, textColor, notation, onNotationChange, connectionInfo}) {
   const theme = useTheme();
   const [buttonsDisabled, setButtonsDisabled] = useState({
     'save': true,
     'edit-table': true,
     'clone-table': true,
+    'one-to-one': true,
     'one-to-many': true,
     'many-to-many': true,
     'show-note': true,
@@ -61,6 +65,7 @@ export function MainToolBar({preferences, eventBus, fillColor, textColor, notati
   });
   const [showDetails, setShowDetails] = useState(true);
 
+  const {saveToolData, isSaveToolDataEnabled} = useApplicationState();
   const {openMenuName, toggleMenu, onMenuClose} = usePgMenuGroup();
   const saveAsMenuRef = React.useRef(null);
   const sqlMenuRef = React.useRef(null);
@@ -121,6 +126,7 @@ export function MainToolBar({preferences, eventBus, fillColor, textColor, notati
       [ERD_EVENTS.SINGLE_NODE_SELECTED, (selected)=>{
         setDisableButton('edit-table', !selected);
         setDisableButton('clone-table', !selected);
+        setDisableButton('one-to-one', !selected);
         setDisableButton('one-to-many', !selected);
         setDisableButton('many-to-many', !selected);
         setDisableButton('show-note', !selected);
@@ -128,9 +134,12 @@ export function MainToolBar({preferences, eventBus, fillColor, textColor, notati
       [ERD_EVENTS.ANY_ITEM_SELECTED, (selected)=>{
         setDisableButton('drop-table', !selected);
       }],
-      [ERD_EVENTS.DIRTY, (isDirty)=>{
+      [ERD_EVENTS.DIRTY, (isDirty, data, fileName)=>{
         isDirtyRef.current = isDirty;
         setDisableButton('save', !isDirty);
+        if((isDirty || fileName) && isSaveToolDataEnabled('ERD')){
+          setSaveERDData({data, fileName, isDirty});
+        }
       }],
     ];
     events.forEach((e)=>{
@@ -142,6 +151,11 @@ export function MainToolBar({preferences, eventBus, fillColor, textColor, notati
       });
     };
   }, []);
+
+  const [saveERDData, setSaveERDData] = useState(null);
+  useDelayDebounce(({data, fileName, isDirty})=>{
+    saveToolData('ERD', {...connectionInfo,'open_file_name':fileName, 'is_editor_dirty': isDirty}, connectionInfo.trans_id, data);
+  }, saveERDData, 500);
 
   useEffect(()=>{
     const showSql = ()=>{
@@ -188,6 +202,11 @@ export function MainToolBar({preferences, eventBus, fillColor, textColor, notati
             }} />
         </PgButtonGroup>
         <PgButtonGroup size="small">
+          <PgIconButton title={gettext('Search Table')} icon={<SearchOutlinedIcon />}
+            shortcut={preferences.search_table}
+            onClick={()=>{
+              eventBus.fireEvent(ERD_EVENTS.SEARCH_NODE);
+            }} />
           <PgIconButton title={gettext('Add Table')} icon={<AddBoxIcon />}
             shortcut={preferences.add_table}
             onClick={()=>{
@@ -210,12 +229,17 @@ export function MainToolBar({preferences, eventBus, fillColor, textColor, notati
             }} />
         </PgButtonGroup>
         <PgButtonGroup size="small">
-          <PgIconButton title={gettext('One-to-Many Relation')} icon={<span style={{letterSpacing: '-1px'}}>1M</span>}
+          <PgIconButton title={gettext('One-to-One Relation')} icon={<span style={{letterSpacing: '-1px'}}>1 - 1</span>}
+            shortcut={preferences.one_to_one} disabled={buttonsDisabled['one-to-one']}
+            onClick={()=>{
+              eventBus.fireEvent(ERD_EVENTS.ONE_TO_ONE);
+            }} />
+          <PgIconButton title={gettext('One-to-Many Relation')} icon={<span style={{letterSpacing: '-1px'}}>1 - M</span>}
             shortcut={preferences.one_to_many} disabled={buttonsDisabled['one-to-many']}
             onClick={()=>{
               eventBus.fireEvent(ERD_EVENTS.ONE_TO_MANY);
             }} />
-          <PgIconButton title={gettext('Many-to-Many Relation')} icon={<span style={{letterSpacing: '-1px'}}>MM</span>}
+          <PgIconButton title={gettext('Many-to-Many Relation')} icon={<span style={{letterSpacing: '-1px'}}>M - M</span>}
             shortcut={preferences.many_to_many} disabled={buttonsDisabled['many-to-many']}
             onClick={()=>{
               eventBus.fireEvent(ERD_EVENTS.MANY_TO_MANY);
@@ -326,6 +350,7 @@ MainToolBar.propTypes = {
   textColor: PropTypes.string,
   notation: PropTypes.string,
   onNotationChange: PropTypes.func,
+  connectionInfo: PropTypes.object,
 };
 
 const ColorButton = withColorPicker(PgIconButton);

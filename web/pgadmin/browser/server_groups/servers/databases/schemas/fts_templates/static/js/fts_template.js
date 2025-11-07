@@ -2,7 +2,7 @@
 //
 // pgAdmin 4 - PostgreSQL Tools
 //
-// Copyright (C) 2013 - 2024, The pgAdmin Development Team
+// Copyright (C) 2013 - 2025, The pgAdmin Development Team
 // This software is released under the PostgreSQL Licence
 //
 //////////////////////////////////////////////////////////////
@@ -58,11 +58,13 @@ define('pgadmin.node.fts_template', [
           applies: ['object', 'context'], callback: 'show_obj_properties',
           category: 'create', priority: 4, label: gettext('FTS Template...'),
           data: {action: 'create'}, enable: 'canCreate',
+          shortcut_preference: ['browser', 'sub_menu_create'],
         },{
           name: 'create_fts_template', node: 'fts_template', module: this,
           applies: ['object', 'context'], callback: 'show_obj_properties',
           category: 'create', priority: 4, label: gettext('FTS Template...'),
           data: {action: 'create'}, enable: 'canCreate',
+          shortcut_preference: ['browser', 'sub_menu_create'],
         }]);
 
       },

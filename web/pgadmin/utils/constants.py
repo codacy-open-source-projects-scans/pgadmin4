@@ -2,7 +2,7 @@
 #
 # pgAdmin 4 - PostgreSQL Tools
 #
-# Copyright (C) 2013 - 2024, The pgAdmin Development Team
+# Copyright (C) 2013 - 2025, The pgAdmin Development Team
 # This software is released under the PostgreSQL Licence
 #
 ##########################################################################
@@ -14,6 +14,8 @@ from flask_babel import gettext
 MIMETYPE_APP_HTML = 'text/html'
 MIMETYPE_APP_JS = 'application/javascript'
 MIMETYPE_APP_JSON = 'application/json'
+
+NO_CACHE_CONTROL = 'no-cache, no-store, must-revalidate'
 
 # Preference labels
 PREF_LABEL_KEYBOARD_SHORTCUTS = gettext('Keyboard shortcuts')
@@ -29,6 +31,7 @@ PREF_LABEL_TABS_SETTINGS = gettext('Tab settings')
 PREF_LABEL_REFRESH_RATES = gettext('Refresh rates')
 PREF_LABEL_GRAPH_VISUALISER = gettext('Graph Visualiser')
 PREF_LABEL_USER_INTERFACE = gettext('User Interface')
+PREF_LABEL_FILE_DOWNLOADS = gettext('File Downloads')
 
 PGADMIN_STRING_SEPARATOR = '_$PGADMIN$_'
 PGADMIN_NODE = 'pgadmin.node.%s'
@@ -91,6 +94,9 @@ BINARY_PATHS = {
          "isDefault": False},
         {"version": "170000", "next_major_version": "180000",
          "serverType": gettext("EDB Advanced Server 17"), "binaryPath": None,
+         "isDefault": False},
+        {"version": "180000", "next_major_version": "190000",
+         "serverType": gettext("EDB Advanced Server 18"), "binaryPath": None,
          "isDefault": False}
     ],
     "pg_bin_paths": [
@@ -108,11 +114,20 @@ BINARY_PATHS = {
          "isDefault": False},
         {"version": "170000", "next_major_version": "180000",
          "serverType": gettext("PostgreSQL 17"), "binaryPath": None,
+         "isDefault": False},
+        {"version": "180000", "next_major_version": "190000",
+         "serverType": gettext("PostgreSQL 18"), "binaryPath": None,
          "isDefault": False}
     ]
 }
 
-UTILITIES_ARRAY = ['pg_dump', 'pg_dumpall', 'pg_restore', 'psql']
+UTILITIES_ARRAY = ['pg_dumpall', 'pg_dump', 'pg_restore', 'psql']
+
+BG_PROCESS_ERROR_MSGS = {
+    3221225781: gettext('Unable to find a dll needed by the utility. Ensure '
+                        '.dll files needed by the utility are in the same '
+                        'folder as your executable.')
+}
 
 ENTER_EMAIL_ADDRESS = "Email address: "
 USER_NOT_FOUND = gettext("The specified user ID (%s) could not be found.")
@@ -126,7 +141,6 @@ MY_STORAGE = 'my_storage'
 ACCESS_DENIED_MESSAGE = gettext(
     "Access denied: You’re having limited access. You’re not allowed to "
     "Rename, Delete or Create any files/folders")
-
 
 KEY_RING_SERVICE_NAME = 'pgAdmin4'
 KEY_RING_USER_NAME = 'pgadmin4-master-password'
@@ -150,3 +164,16 @@ IP_ADDRESS_STRING = '{}/{}'
 TWO_PARAM_STRING = '{0}/{1}'
 SERVER_NOT_FOUND = gettext("Could not find the specified server.")
 SSL_MODES = ['prefer', 'require', 'verify-ca', 'verify-full']
+
+DATA_TYPE_WITH_LENGTH = [1560, 'bit', 1561, 'bit[]',
+                         1562, 'varbit', 'bit varying',
+                         1563, 'varbit[]', 'bit varying[]',
+                         1042, 'bpchar', 'character',
+                         1043, 'varchar', 'character varying',
+                         1014, 'bpchar[]', 'character[]',
+                         1015, 'varchar[]', 'character varying[]',
+                         'vector', 'vector[]', 'halfvec', 'halfvec[]',
+                         'sparsevec', 'sparsevec[]']
+
+RESTRICTION_TYPE_DATABASES = 'databases'
+RESTRICTION_TYPE_SQL = 'sql'

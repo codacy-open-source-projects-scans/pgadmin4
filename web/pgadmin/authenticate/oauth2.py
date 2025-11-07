@@ -2,7 +2,7 @@
 #
 # pgAdmin 4 - PostgreSQL Tools
 #
-# Copyright (C) 2013 - 2024, The pgAdmin Development Team
+# Copyright (C) 2013 - 2025, The pgAdmin Development Team
 # This software is released under the PostgreSQL Licence
 #
 ##########################################################################
@@ -76,10 +76,13 @@ def init_app(app):
 
         if not current_user.is_authenticated:
             return redirect(get_safe_post_logout_redirect())
+
+        # Logout the user first to avoid crypt key issue while
+        # cancelling existing query tool transactions
+        logout_user()
         for key in list(session.keys()):
             session.pop(key)
 
-        logout_user()
         if logout_url:
             return redirect(logout_url.format(
                 redirect_uri=request.url_root,
@@ -106,6 +109,26 @@ class OAuth2Authentication(BaseAuthentication):
             OAuth2Authentication.oauth2_config[
                 oauth2_config['OAUTH2_NAME']] = oauth2_config
 
+            # Build client_kwargs with defaults
+            client_kwargs = {
+                'scope': oauth2_config.get(
+                    'OAUTH2_SCOPE', 'email profile'),
+                'verify': oauth2_config.get(
+                    'OAUTH2_SSL_CERT_VERIFICATION', True)
+            }
+
+            # Override with PKCE parameters if provided
+            if 'OAUTH2_CHALLENGE_METHOD' in oauth2_config and \
+                    'OAUTH2_RESPONSE_TYPE' in oauth2_config:
+                # Merge PKCE kwargs with defaults
+                pkce_kwargs = {
+                    'code_challenge_method': oauth2_config[
+                        'OAUTH2_CHALLENGE_METHOD'],
+                    'response_type': oauth2_config[
+                        'OAUTH2_RESPONSE_TYPE']
+                }
+                client_kwargs.update(pkce_kwargs)
+
             OAuth2Authentication.oauth2_clients[
                 oauth2_config['OAUTH2_NAME']
             ] = OAuth2Authentication.oauth_obj.register(
@@ -115,10 +138,7 @@ class OAuth2Authentication(BaseAuthentication):
                 access_token_url=oauth2_config['OAUTH2_TOKEN_URL'],
                 authorize_url=oauth2_config['OAUTH2_AUTHORIZATION_URL'],
                 api_base_url=oauth2_config['OAUTH2_API_BASE_URL'],
-                client_kwargs={'scope': oauth2_config.get(
-                    'OAUTH2_SCOPE', 'email profile'),
-                    'verify': oauth2_config.get(
-                    'OAUTH2_SSL_CERT_VERIFICATION', True)},
+                client_kwargs=client_kwargs,
                 server_metadata_url=oauth2_config.get(
                     'OAUTH2_SERVER_METADATA_URL', None)
             )
@@ -132,11 +152,36 @@ class OAuth2Authentication(BaseAuthentication):
     def validate(self, form):
         return True, None
 
+    def get_profile_dict(self, profile):
+        """
+        Returns the dictionary from profile
+        whether it's a list or dictionary.
+        Includes additional type checking.
+        """
+        if isinstance(profile, list):
+            return profile[0] if profile else {}
+        elif isinstance(profile, dict):
+            return profile
+        else:
+            return {}
+
     def login(self, form):
         profile = self.get_user_profile()
-        email_key = \
-            [value for value in self.email_keys if value in profile.keys()]
-        email = profile[email_key[0]] if (len(email_key) > 0) else None
+        profile_dict = self.get_profile_dict(profile)
+
+        current_app.logger.debug(f"profile: {profile}")
+        current_app.logger.debug(f"profile_dict: {profile_dict}")
+
+        if not profile_dict:
+            error_msg = "No profile data found."
+            current_app.logger.exception(error_msg)
+            return False, gettext(error_msg)
+
+        email_key = [
+            value for value in self.email_keys
+            if value in profile_dict.keys()
+        ]
+        email = profile_dict[email_key[0]] if (len(email_key) > 0) else None
 
         username = email
         username_claim = None

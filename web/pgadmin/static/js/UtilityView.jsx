@@ -2,12 +2,12 @@
 //
 // pgAdmin 4 - PostgreSQL Tools
 //
-// Copyright (C) 2013 - 2024, The pgAdmin Development Team
+// Copyright (C) 2013 - 2025, The pgAdmin Development Team
 // This software is released under the PostgreSQL Licence
 //
 //////////////////////////////////////////////////////////////
 
-import React, { useEffect, useRef } from 'react';
+import { useEffect, useRef } from 'react';
 import getApiInstance from 'sources/api_instance';
 import {getHelpUrl, getEPASHelpUrl} from 'pgadmin.help';
 import SchemaView from 'sources/SchemaView';
@@ -213,7 +213,6 @@ function UtilityViewContent({schema, treeNodeInfo, actionType, formType, onClose
 }
 
 UtilityViewContent.propTypes = {
-  panelId: PropTypes.string,
   schema: PropTypes.object,
   treeNodeInfo: PropTypes.object,
   actionType: PropTypes.string,

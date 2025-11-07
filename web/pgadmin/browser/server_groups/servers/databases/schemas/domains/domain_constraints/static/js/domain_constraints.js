@@ -2,7 +2,7 @@
 //
 // pgAdmin 4 - PostgreSQL Tools
 //
-// Copyright (C) 2013 - 2024, The pgAdmin Development Team
+// Copyright (C) 2013 - 2025, The pgAdmin Development Team
 // This software is released under the PostgreSQL Licence
 //
 //////////////////////////////////////////////////////////////
@@ -53,6 +53,7 @@ define('pgadmin.node.domain_constraints', [
           applies: ['object', 'context'], callback: 'show_obj_properties',
           category: 'create', priority: 5, label: gettext('Domain Constraint...'),
           data: {action: 'create', check: true}, enable: 'canCreate',
+          shortcut_preference: ['browser', 'sub_menu_create'],
         },{
           name: 'create_domain_constraints', node: 'domain_constraints', module: this,
           applies: ['object', 'context'], callback: 'show_obj_properties',
@@ -63,6 +64,7 @@ define('pgadmin.node.domain_constraints', [
           applies: ['object', 'context'], callback: 'show_obj_properties',
           category: 'create', priority: 5, label: gettext('Domain Constraint...'),
           data: {action: 'create', check: false}, enable: 'canCreate',
+          shortcut_preference: ['browser', 'sub_menu_create'],
         },
         ]);
 

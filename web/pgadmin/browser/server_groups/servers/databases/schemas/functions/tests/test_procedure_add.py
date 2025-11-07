@@ -2,7 +2,7 @@
 #
 # pgAdmin 4 - PostgreSQL Tools
 #
-# Copyright (C) 2013 - 2024, The pgAdmin Development Team
+# Copyright (C) 2013 - 2025, The pgAdmin Development Team
 # This software is released under the PostgreSQL Licence
 #
 ##########################################################################
@@ -62,6 +62,7 @@ class ProcedureAddTestCase(BaseTestGenerator):
             "prosrc": "BEGIN RAISE EXCEPTION 'command % is disabled',"
                       " tg_tag; END;",
             "seclabels": [],
+            "dependsonextensions": ["plpgsql"],
             "variables": [
                 {
                     "name": "enable_sort",

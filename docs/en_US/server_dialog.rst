@@ -177,6 +177,9 @@ not be able to connect directly.
   *Identity file* field to specify the location of the key file.
 * If the SSH host is expecting a password of the user name or an identity file
   if being used, use the *Password* field to specify the password.
+* Check the box next to *Prompt for password?* to to have pgAdmin prompt for
+  a password if the identity file includes one. This setting applies only when
+  using an identity file, which may or may not require a password.
 * Check the box next to *Save password?* to instruct pgAdmin to save the
   password for future use. Use
   :ref:`Clear SSH Tunnel Password <clear_saved_passwords>` to remove the saved
@@ -195,19 +198,27 @@ Click the *Advanced* tab to continue.
 
 Use the fields in the *Advanced* tab to configure a connection:
 
-* Use the *DB restriction* field to provide a SQL restriction that will be used
-  against the pg_database table to limit the databases that you see. For
-  example, you might enter: *live_db test_db* so that only live_db and test_db
-  are shown in the pgAdmin browser. Separate entries with a comma or tab as you
-  type.
+* Specify the type of the database restriction that will be used to filter
+  out the databases for restriction in the *DB restriction type* field:
+
+    * Select the *Databases* option to specify the name of the databases
+      that will be used against the pg_database table to limit the databases
+      that you see. This is the default.
+    * Select the *SQL* option to provide a SQL restriction that will be used
+      against the pg_database table to limit the databases that you see.
+
+* Use the *DB restriction* field to provide a SQL restriction OR Database names
+  that will be used against the pg_database table to limit the databases that you see.
+  For example, you might enter: *live_db test_db* so that only live_db and test_db
+  are shown in the pgAdmin object explorer.
 * Use the *Password exec command* field to specify a shell command to be executed
   to retrieve a password to be used for SQL authentication. The ``stdout`` of the
   command will be used as the SQL password. This may be useful when the password
   should be generated as a transient authorization token instead of providing a
   password when connecting in `PAM authentication <https://www.postgresql.org/docs/current/auth-pam.html>`_ scenarios.
   You can pass server hostname, port and DB username to the password exec command as variable by providing placeholders
-  like ``%HOST%``, ``%PORT%`` and ``%USERNAME%`` which will be replace with the server connection information.
-  Example: ``/path/to/script --hostnmae %HOST% --port %PORT% --username %USERNAME%``
+  like ``%HOSTNAME%``, ``%PORT%`` and ``%USERNAME%`` which will be replace with the server connection information.
+  Example: ``/path/to/script --hostname %HOSTNAME% --port %PORT% --username %USERNAME%``
 * Use the *Password exec expiration* field to specify a maximum age, in seconds,
   of the password generated with a *Password exec command*. If not specified,
   the password will not expire until your pgAdmin session does.
@@ -225,14 +236,14 @@ Use the fields in the *Advanced* tab to configure a connection:
 
 .. note:: The Password exec option is only supported when pgAdmin is run in desktop mode.
 
-* Click the *Save* button to save your work.
-* Click the *Close* button to exit without saving your work.
-* Click the *Reset* button to return the values specified on the Server dialog
-  to their original condition.
+Click the *Post Connection SQL* tab to continue.
 
-.. toctree::
+.. image:: images/server_post_connection_sql.png
+    :alt: Server dialog post connection sql tab
+    :align: center
 
-    clear_saved_passwords
+* Use the *Post Connection SQL* field to write the SQL queries that will be
+  executed in autocommit mode for each connection made to any database on this server.
 
 
 Click the *Tags* tab to continue.
@@ -245,6 +256,15 @@ Use the table in the *Tags* tab to add tags. The tags will be shown on the right
 a server node label in the object explorer tree.
 
 Click on the *+* button to add a new tag. Some of the parameters are:
+  * *Text* field to specify the tag name.
+  * *Color* field to select the accent color of the tag.
 
-* *Text* field to specify the tag name.
-* *Color* field to select the accent color of the tag.
+
+* Click the *Save* button to save your work.
+* Click the *Close* button to exit without saving your work.
+* Click the *Reset* button to return the values specified on the Server dialog
+  to their original condition.
+
+.. toctree::
+
+    clear_saved_passwords

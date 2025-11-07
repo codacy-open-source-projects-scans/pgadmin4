@@ -2,12 +2,11 @@
 //
 // pgAdmin 4 - PostgreSQL Tools
 //
-// Copyright (C) 2013 - 2024, The pgAdmin Development Team
+// Copyright (C) 2013 - 2025, The pgAdmin Development Team
 // This software is released under the PostgreSQL Licence
 //
 //////////////////////////////////////////////////////////////
 
-import React, { forwardRef } from 'react';
 import { styled } from '@mui/material/styles';
 import CustomPropTypes from '../custom_prop_types';
 import { Box } from '@mui/material';
@@ -29,11 +28,17 @@ const StyledBox = styled(Box)(({theme})=>({
   },
 }));
 
-export const ModalContent = forwardRef(({children, ...props }, ref) => {
+export function ModalContent(
+  {
+    ref,
+    children,
+    ...props
+  }
+) {
   return (
     <StyledBox style={{height: '100%'}} ref={ref}  {...props}>{children}</StyledBox>
   );
-});
+};
 ModalContent.displayName = 'ModalContent';
 ModalContent.propTypes = {
   children: CustomPropTypes.children,

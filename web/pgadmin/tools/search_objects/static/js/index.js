@@ -2,13 +2,12 @@
 //
 // pgAdmin 4 - PostgreSQL Tools
 //
-// Copyright (C) 2013 - 2024, The pgAdmin Development Team
+// Copyright (C) 2013 - 2025, The pgAdmin Development Team
 // This software is released under the PostgreSQL Licence
 //
 //////////////////////////////////////////////////////////////
 import pgAdmin from 'sources/pgadmin';
 import pgBrowser from 'top/browser/static/js/browser';
-import React from 'react';
 import gettext from 'sources/gettext';
 import SearchObjects from './SearchObjects';
 import {getPanelTitle} from '../../../sqleditor/static/js/sqleditor_title';
@@ -47,6 +46,8 @@ export default class SearchObjectModule {
       data: {
         data_disabled: gettext('Please select a database from the object explorer to search the database objects.'),
       },
+      permission: 'tools_search_objects',
+      shortcut_preference: ['browser', 'sub_menu_search_objects'],
     }];
 
     pgBrowser.add_menus(menus);

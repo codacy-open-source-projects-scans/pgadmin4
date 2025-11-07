@@ -2,7 +2,7 @@
 //
 // pgAdmin 4 - PostgreSQL Tools
 //
-// Copyright (C) 2013 - 2024, The pgAdmin Development Team
+// Copyright (C) 2013 - 2025, The pgAdmin Development Team
 // This software is released under the PostgreSQL Licence
 //
 //////////////////////////////////////////////////////////////
@@ -12,9 +12,9 @@ import * as React from 'react';
 import { ClasslistComposite } from 'aspen-decorations';
 import { Directory, FileEntry, IItemRendererProps, ItemType, RenamePromptHandle, FileType, FileOrDir} from 'react-aspen';
 import {IFileTreeXTriggerEvents, FileTreeXEvent } from '../types';
-import _ from 'lodash';
 import { Notificar } from 'notificar';
-
+import _ from 'lodash';
+import DoubleClickHandler from './DoubleClickHandler';
 interface IItemRendererXProps {
     /**
      * In this implementation, decoration are null when item is `PromptHandle`
@@ -58,7 +58,6 @@ export class FileTreeItem extends React.Component<IItemRendererXProps & IItemRen
 
   public render() {
     const { item, itemType, decorations } = this.props;
-
     const isRenamePrompt = itemType === ItemType.RenamePrompt;
     const isNewPrompt = itemType === ItemType.NewDirectoryPrompt || itemType === ItemType.NewFilePrompt;
     const isDirExpanded = itemType === ItemType.Directory
@@ -84,31 +83,29 @@ export class FileTreeItem extends React.Component<IItemRendererXProps & IItemRen
     const tags = item._metadata.data?.tags ?? [];
 
     return (
-      <div
-        className={cn('file-entry', {
-          renaming: isRenamePrompt,
-          prompt: isRenamePrompt || isNewPrompt,
-          new: isNewPrompt,
-        }, fileOrDir, decorations ? decorations.classlist : null, `depth-${item.depth}`, extraClasses)}
-        data-depth={item.depth}
-        onContextMenu={this.handleContextMenu}
-        onClick={this.handleClick}
-        onDoubleClick={this.handleDoubleClick}
-        onDragStart={this.handleDragStartItem}
-        onMouseEnter={this.handleMouseEnter}
-        onMouseLeave={this.handleMouseLeave}
-        onKeyDown={()=>{/* taken care by parent */}}
-        // required for rendering context menus when opened through context menu button on keyboard
-        ref={this.handleDivRef}
-        draggable={true}>
+      <DoubleClickHandler onDoubleClick={this.handleDoubleClick} onSingleClick={this.handleClick}>
+        <div
+          className={cn('file-entry', {
+            renaming: isRenamePrompt,
+            prompt: isRenamePrompt || isNewPrompt,
+            new: isNewPrompt,
+          }, fileOrDir, decorations ? decorations.classlist : null, `depth-${item.depth}`, extraClasses)}
+          data-depth={item.depth}
+          onContextMenu={this.handleContextMenu}
+          onDragStart={this.handleDragStartItem}
+          onMouseEnter={this.handleMouseEnter}
+          onMouseLeave={this.handleMouseLeave}
+          onKeyDown={()=>{/* taken care by parent */}}
+          // required for rendering context menus when opened through context menu button on keyboard
+          ref={this.handleDivRef}
+          draggable={true}>
 
-        {!isNewPrompt && fileOrDir === 'directory' ?
-          <i className={cn('directory-toggle', isDirExpanded ? 'open' : '')} />
-          : null
-        }
+          {!isNewPrompt && fileOrDir === 'directory' ?
+            <i className={cn('directory-toggle', isDirExpanded ? 'open' : '')} />
+            : null
+          }
 
-        <span className='file-label'>
-          {
+          <span className='file-label'>{
             item._metadata?.data?.icon ?
               <i className={cn('file-icon', item._metadata?.data?.icon ? item._metadata.data.icon : fileOrDir)} /> : null
           }
@@ -121,8 +118,10 @@ export class FileTreeItem extends React.Component<IItemRendererXProps & IItemRen
               {tag.text}
             </div>
           ))}
-        </span>
-      </div>);
+          </span>
+        </div>
+      </DoubleClickHandler>
+    );
   }
 
   public componentDidMount() {
@@ -131,10 +130,10 @@ export class FileTreeItem extends React.Component<IItemRendererXProps & IItemRen
     if (this.props.decorations) {
       this.props.decorations.addChangeListener(this.forceUpdate);
     }
-    this.setActiveFile(this.props.item);
+    this.setFileLoaded(this.props.item);
   }
 
-  private readonly setActiveFile = async (FileOrDir): Promise<void> => {
+  private readonly setFileLoaded = async (FileOrDir): Promise<void> => {
     this.props.changeDirectoryCount(FileOrDir.parent);
     if(FileOrDir._loaded !== true) {
       this.events.dispatch(FileTreeXEvent.onTreeEvents, window.event, 'added', FileOrDir);

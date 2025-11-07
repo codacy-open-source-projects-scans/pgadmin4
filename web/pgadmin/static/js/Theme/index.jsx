@@ -2,7 +2,7 @@
 //
 // pgAdmin 4 - PostgreSQL Tools
 //
-// Copyright (C) 2013 - 2024, The pgAdmin Development Team
+// Copyright (C) 2013 - 2025, The pgAdmin Development Team
 // This software is released under the PostgreSQL Licence
 //
 //////////////////////////////////////////////////////////////
@@ -12,10 +12,10 @@
  * custom themes info will come here.
  */
 
-import React, { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { createTheme, ThemeProvider } from '@mui/material/styles';
 import { LocalizationProvider } from '@mui/x-date-pickers';
-import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFnsV3';
+import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 import CustomPropTypes from '../custom_prop_types';
 import getLightTheme from './light';
 import getDarkTheme from './dark';
@@ -38,6 +38,7 @@ basicSettings = createTheme(basicSettings, {
     fontSize: 14,
     htmlFontSize: 14,
     fontFamilyIcon: '"Font Awesome 5 Free"',
+    fontFamilySourceCode: '"Source Code Pro", SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace',
     fontFamily: [
       'Roboto',
       '"Helvetica Neue"',
@@ -206,11 +207,49 @@ basicSettings = createTheme(basicSettings, {
           height: '100%',
           boxSizing: 'border-box',
         },
+        adornedStart: {
+          paddingLeft: basicSettings.spacing(0.75),
+        },
+        inputAdornedStart: {
+          paddingLeft: '2px',
+        },
         adornedEnd: {
           paddingRight: basicSettings.spacing(0.75),
         },
         marginDense: {
           height: '28px',
+        }
+      }
+    },
+    MuiPickersOutlinedInput: {
+      styleOverrides: {
+        multiline: {
+          padding: '0px',
+        },
+        input: {
+          padding: basicSettings.spacing(0.75, 1.5),
+          borderRadius: 'inherit',
+        },
+        inputMultiline: {
+          padding: basicSettings.spacing(0.75, 1.5),
+          resize: 'vertical',
+          height: '100%',
+          boxSizing: 'border-box',
+        },
+        adornedStart: {
+          paddingLeft: basicSettings.spacing(0.75),
+        },
+        inputAdornedStart: {
+          paddingLeft: '2px',
+        },
+        adornedEnd: {
+          paddingRight: basicSettings.spacing(0.75),
+        },
+        marginDense: {
+          height: '28px',
+        },
+        sectionsContainer: {
+          padding: '0px',
         }
       }
     },
@@ -289,6 +328,7 @@ basicSettings = createTheme(basicSettings, {
     MuiTooltip: {
       defaultProps: {
         arrow: true,
+        disableInteractive: true
       },
       styleOverrides: {
         popper: {
@@ -321,6 +361,20 @@ basicSettings = createTheme(basicSettings, {
             backgroundColor: 'unset',
           }
         }
+      }
+    },
+    MuiBadge: {
+      defaultProps: {
+        overlap: 'circular',
+        color: 'success',
+        variant: 'dot',
+      },
+      styleOverrides: {
+        badge: {
+          height: '6px',
+          minWidth: '6px',
+          right: '16%',
+        },
       }
     }
   },
@@ -360,7 +414,7 @@ function getFinalTheme(baseTheme) {
       flexGrow: 1,
     },
     fontSourceCode: {
-      fontFamily: '"Source Code Pro", SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace',
+      fontFamily: basicSettings.typography.fontFamilySourceCode,
     }
   };
 
@@ -454,6 +508,37 @@ function getFinalTheme(baseTheme) {
           }
         }
       },
+      MuiPickersTextField: {
+        styleOverrides: {
+          root: {
+            width: '100%',
+          }
+        }
+      },
+      MuiPickersOutlinedInput:  {
+        styleOverrides: {
+          root: {
+            lineHeight: '1.1876em',
+            fontSize: 'inherit',
+            backgroundColor: baseTheme.palette.background.default,
+            textOverflow: 'ellipsis',
+            '&.Mui-disabled': {
+              backgroundColor: baseTheme.otherVars.inputDisabledBg,
+            },
+            padding: '2px 12px',
+          },
+          notchedOutline: {
+            borderColor: baseTheme.otherVars.inputBorderColor,
+          },
+        }
+      },
+      MuiPickersSectionList: {
+        styleOverrides: {
+          root: {
+            padding: '0px',
+          }
+        }
+      },
       MuiFormControlLabel: {
         styleOverrides: {
           label: {
@@ -522,7 +607,7 @@ function getFinalTheme(baseTheme) {
           },
           inputSizeSmall: {
             height: '16px', // + 12px of padding = 28px;
-          }
+          },
         }
       },
       MuiSelect: {
@@ -636,12 +721,12 @@ function getFinalTheme(baseTheme) {
         styleOverrides: {
           root: {
             padding: '0px',
-            color: baseTheme.otherVars.inputBorderColor,
+            color: baseTheme.custom.checkbox.borderColor,
           },
 
           colorPrimary: {
             '&.Mui-disabled': {
-              color: baseTheme.palette.checkbox.disabled
+              color: baseTheme.custom.checkbox.disabled
             }
           }
         }
@@ -650,12 +735,12 @@ function getFinalTheme(baseTheme) {
         styleOverrides: {
           root: {
             padding: '0px',
-            color: baseTheme.otherVars.inputBorderColor,
+            color: baseTheme.custom.checkbox.borderColor,
           },
 
           colorPrimary: {
             '&.Mui-disabled': {
-              color: baseTheme.palette.checkbox.disabled
+              color: baseTheme.custom.checkbox.disabled
             }
           }
         }
@@ -787,13 +872,17 @@ function getFinalTheme(baseTheme) {
       MuiTab: {
         styleOverrides: {
           root: {
-            '&.MuiTab-textColorPrimary':{
+            '&:not(.Mui-disabled).MuiTab-textColorPrimary':{
               color: baseTheme.palette.text.primary,
             },
             '&.Mui-selected': {
               color: baseTheme.otherVars.activeColor,
             },
-          }
+          },
+          icon: {
+            fontSize: '1rem',
+            marginRight: '2px',
+          },
         }
       },
       MuiBackdrop: {
@@ -807,12 +896,34 @@ function getFinalTheme(baseTheme) {
   }, baseTheme);
 }
 
+/* Get the actual system theme is user selected system theme in preferences */
+function parseSystemTheme(selectedTheme) {
+  if (selectedTheme === 'system') {
+    const systemMatchMedia = matchMedia('(prefers-color-scheme: dark)');
+    return {
+      'theme': systemMatchMedia.matches ? 'dark' : 'light',
+      'systemMatchMedia': systemMatchMedia,
+    };
+  }
+  return {
+    'theme': selectedTheme,
+    'systemMatchMedia': null,
+  };
+}
+
 /* Theme wrapper used by DOM containers to apply theme */
 /* In future, this will be moved to App container */
 export default function Theme({children}) {
   const prefStore = usePreferences();
-  const [theme, setTheme] = useState();
+  const selectedTheme =
+    prefStore?.getPreferencesForModule('misc')?.theme ||
+    window.theme ||
+    'light';
 
+  // Initialize theme state
+  const [theme, setTheme] = useState(parseSystemTheme(selectedTheme).theme);
+
+  // Memoize the theme object
   const themeObj = useMemo(()=>{
     let baseTheme = getLightTheme(basicSettings);
     switch(theme) {
@@ -826,31 +937,26 @@ export default function Theme({children}) {
     return getFinalTheme(baseTheme);
   }, [theme]);
 
+  // Handle theme updates
   useEffect(() => {
-    const selectedTheme = prefStore.getPreferencesForModule('misc').theme;
-    if(theme && theme === selectedTheme) {
-      return;
-    }else{
-      if (selectedTheme !== 'system') {
-        setTheme(selectedTheme);
-        return;
-      }
-      const isSystemInDarkMode = matchMedia('(prefers-color-scheme: dark)');
-      setTheme(isSystemInDarkMode.matches ? 'dark' : 'light');
-      const listener = (event) => {
-        setTheme(event.matches ? 'dark' : 'light');
-      };
-      isSystemInDarkMode.addEventListener('change',listener);
-      return () => {
-        isSystemInDarkMode.removeEventListener('change',listener);
-      };
-    }
-  },[prefStore]);
+    let {theme, systemMatchMedia} = parseSystemTheme(selectedTheme);
+    setTheme(theme);
+
+    const updateTheme = (event) => {
+      const newTheme = event.matches ? 'dark' : 'light';
+      setTheme(newTheme);
+    };
+    systemMatchMedia?.addEventListener('change', updateTheme);
+
+    return () => {
+      systemMatchMedia?.removeEventListener('change', updateTheme);
+    };
+  },[selectedTheme]);
 
   return (
     <ThemeProvider theme={themeObj}>
       <CssBaseline />
-      <LocalizationProvider dateAdapter={AdapterDateFns} >
+      <LocalizationProvider dateAdapter={AdapterDateFns}>
         {children}
       </LocalizationProvider>
     </ThemeProvider>

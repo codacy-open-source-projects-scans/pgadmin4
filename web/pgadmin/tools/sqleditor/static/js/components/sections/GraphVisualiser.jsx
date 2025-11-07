@@ -2,7 +2,7 @@
 //
 // pgAdmin 4 - PostgreSQL Tools
 //
-// Copyright (C) 2013 - 2024, The pgAdmin Development Team
+// Copyright (C) 2013 - 2025, The pgAdmin Development Team
 // This software is released under the PostgreSQL Licence
 //
 //////////////////////////////////////////////////////////////
@@ -26,6 +26,7 @@ import { LineChart, BarChart, PieChart, DATA_POINT_STYLE, DATA_POINT_SIZE,
   LightenDarkenColor} from 'sources/chartjs';
 import { QueryToolEventsContext, QueryToolContext } from '../QueryToolComponent';
 import { QUERY_TOOL_EVENTS, PANELS } from '../QueryToolConstants';
+import DownloadUtils from '../../../../../../static/js/DownloadUtils';
 import { getChartColor } from '../../../../../../static/js/utils';
 
 const StyledBox = styled(Box)(({theme}) => ({
@@ -377,11 +378,10 @@ export function GraphVisualiser({initColumns}) {
   };
 
   // Download button callback
-  const onDownloadGraph = ()=> {
-    let a = document.createElement('a');
-    a.href = chartObjRef.current.toBase64Image();
-    a.download = 'graph_visualiser-' + new Date().getTime() + '.png';
-    a.click();
+  const onDownloadGraph = async ()=> {
+    let downloadUrl = chartObjRef.current.toBase64Image(),
+      fileName = 'graph_visualiser-' + new Date().getTime() + '.png';
+    DownloadUtils.downloadBase64UrlData(downloadUrl, fileName);
   };
 
   // This plugin is used to set the background color of the canvas. Very useful

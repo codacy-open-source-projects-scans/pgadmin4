@@ -2,12 +2,12 @@
 //
 // pgAdmin 4 - PostgreSQL Tools
 //
-// Copyright (C) 2013 - 2024, The pgAdmin Development Team
+// Copyright (C) 2013 - 2025, The pgAdmin Development Team
 // This software is released under the PostgreSQL Licence
 //
 //////////////////////////////////////////////////////////////
 
-import React, { useState, useRef, useEffect, useLayoutEffect } from 'react';
+import { useState, useRef, useEffect, useLayoutEffect } from 'react';
 import gettext from 'sources/gettext';
 import { Box } from '@mui/material';
 import { DefaultButton, PrimaryButton } from '../components/Buttons';
@@ -73,7 +73,7 @@ export default function ConnectServerContent({closeModal, data, onOK, setHeight,
             <InputText inputRef={firstEleRef} type="password" value={formData['tunnel_password']} controlProps={{maxLength:null, autoComplete:'new-password'}}
               onChange={(e)=>onTextChange(e, 'tunnel_password')} onKeyDown={(e)=>onKeyDown(e)} />
           </Box>
-          <Box marginTop='12px' marginBottom='12px' visibility={data.hide_save_tunnel_password ? 'hidden' : 'unset'}>
+          <Box marginTop='12px' marginBottom='12px' visibility={hideSavePassword ? 'hidden' : 'unset'}>
             <InputCheckbox controlProps={{label: gettext('Save Password')}} value={formData['save_tunnel_password']}
               onChange={(e)=>onTextChange(e.target.checked, 'save_tunnel_password')} disabled={!data.allow_save_tunnel_password} />
           </Box>
@@ -109,21 +109,23 @@ export default function ConnectServerContent({closeModal, data, onOK, setHeight,
         <DefaultButton data-test="close" startIcon={<CloseIcon />} onClick={()=>{
           closeModal();
         }} >{gettext('Cancel')}</DefaultButton>
-        <PrimaryButton ref={okBtnRef} data-test="save" startIcon={<CheckRoundedIcon />} onClick={()=>{
-          let postFormData = new FormData();
-          if(data.prompt_tunnel_password) {
-            postFormData.append('tunnel_password', formData.tunnel_password);
-            formData.save_tunnel_password &&
-              postFormData.append('save_tunnel_password', formData.save_tunnel_password);
-          }
-          if(data.prompt_password) {
-            postFormData.append('password', formData.password);
-            formData.save_password &&
-              postFormData.append('save_password', formData.save_password);
-          }
-          onOK?.(postFormData);
-          closeModal();
-        }} >{gettext('OK')}</PrimaryButton>
+        {(data.prompt_password || data.prompt_tunnel_password) && <>
+          <PrimaryButton ref={okBtnRef} data-test="save" startIcon={<CheckRoundedIcon />} onClick={()=>{
+            let postFormData = new FormData();
+            if(data.prompt_tunnel_password) {
+              postFormData.append('tunnel_password', formData.tunnel_password);
+              formData.save_tunnel_password &&
+                postFormData.append('save_tunnel_password', formData.save_tunnel_password);
+            }
+            if(data.prompt_password) {
+              postFormData.append('password', formData.password);
+              formData.save_password &&
+                postFormData.append('save_password', formData.save_password);
+            }
+            onOK?.(postFormData);
+            closeModal();
+          }} >{gettext('OK')}</PrimaryButton>
+        </>}
       </ModalFooter>
     </ModalContent>
   );

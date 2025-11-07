@@ -2,7 +2,7 @@
 //
 // pgAdmin 4 - PostgreSQL Tools
 //
-// Copyright (C) 2013 - 2024, The pgAdmin Development Team
+// Copyright (C) 2013 - 2025, The pgAdmin Development Team
 // This software is released under the PostgreSQL Licence
 //
 //////////////////////////////////////////////////////////////
@@ -26,9 +26,10 @@ export const QUERY_TOOL_EVENTS = {
   TRIGGER_INCLUDE_EXCLUDE_FILTER: 'TRIGGER_INCLUDE_EXCLUDE_FILTER',
   TRIGGER_REMOVE_FILTER: 'TRIGGER_REMOVE_FILTER',
   TRIGGER_SET_LIMIT: 'TRIGGER_SET_LIMIT',
-  TRIGGER_FORMAT_SQL: 'TRIGGER_FORMAT_SQL',
   TRIGGER_GRAPH_VISUALISER: 'TRIGGER_GRAPH_VISUALISER',
   TRIGGER_SELECT_ALL: 'TRIGGER_SELECT_ALL',
+  TRIGGER_SAVE_QUERY_TOOL_DATA: 'TRIGGER_SAVE_QUERY_TOOL_DATA',
+  TRIGGER_GET_QUERY_CONTENT: 'TRIGGER_GET_QUERY_CONTENT',
 
   COPY_DATA: 'COPY_DATA',
   SET_LIMIT_VALUE: 'SET_LIMIT_VALUE',
@@ -98,6 +99,10 @@ export const CONNECTION_STATUS_MESSAGE = {
   [CONNECTION_STATUS.TRANSACTION_STATUS_INTRANS]: gettext('The session is idle in a valid transaction block.'),
   [CONNECTION_STATUS.TRANSACTION_STATUS_INERROR]: gettext('The session is idle in a failed transaction block.'),
   [CONNECTION_STATUS.TRANSACTION_STATUS_UNKNOWN]: gettext('The connection with the server is bad.')
+};
+
+export const MODAL_DIALOGS = {
+  QT_CONFIRMATIONS: 'id-qt-close-confirmation',
 };
 
 export const PANELS = {

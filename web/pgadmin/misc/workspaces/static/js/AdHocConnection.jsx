@@ -2,12 +2,12 @@
 //
 // pgAdmin 4 - PostgreSQL Tools
 //
-// Copyright (C) 2013 - 2024, The pgAdmin Development Team
+// Copyright (C) 2013 - 2025, The pgAdmin Development Team
 // This software is released under the PostgreSQL Licence
 //
 //////////////////////////////////////////////////////////////
 
-import React, { useMemo, useState } from 'react';
+import { useEffect, useMemo } from 'react';
 import gettext from 'sources/gettext';
 import url_for from 'sources/url_for';
 import _ from 'lodash';
@@ -27,11 +27,13 @@ import * as commonUtils from 'sources/utils';
 import * as showQueryTool from '../../../../tools/sqleditor/static/js/show_query_tool';
 import { getTitle, generateTitle } from '../../../../tools/sqleditor/static/js/sqleditor_title';
 import usePreferences from '../../../../preferences/static/js/store';
-import { BROWSER_PANELS } from '../../../../browser/static/js/constants';
+import { BROWSER_PANELS, WORKSPACES } from '../../../../browser/static/js/constants';
 import { isEmptyString } from '../../../../static/js/validators';
+import { getRandomInt } from '../../../../static/js/utils';
+import { useWorkspace } from './WorkspaceProvider';
 
 class AdHocConnectionSchema extends BaseUISchema {
-  constructor(connectExistingServer, initValues={}) {
+  constructor(connectExistingServer, pgAdmin, initValues={}) {
     super({
       sid: null,
       did: null,
@@ -49,13 +51,21 @@ class AdHocConnectionSchema extends BaseUISchema {
         {'name': 'sslmode', 'value': 'prefer', 'keyword': 'sslmode'},
         {'name': 'connect_timeout', 'value': 10, 'keyword': 'connect_timeout'}],
       ...initValues,
+      connection_refresh: 0,
     });
     this.flatServers = [];
     this.groupedServers = [];
     this.dbs = [];
     this.api = getApiInstance();
     this.connectExistingServer = connectExistingServer;
+    this.pgAdmin = pgAdmin;
     this.paramSchema = new VariableSchema(getConnectionParameters, null, null, ['name', 'keyword', 'value']);
+  }
+
+  refreshServerList() {
+    // its better to refresh the server list than monkey patching server connected status.
+    this.groupedServers = [];
+    this.state.setUnpreparedData(['connection_refresh'], getRandomInt(1, 9999));
   }
 
   setServerConnected(sid, icon) {
@@ -75,12 +85,17 @@ class AdHocConnectionSchema extends BaseUISchema {
   }
 
   getServerList() {
+    let obj = this;
     if(this.groupedServers?.length != 0) {
       return Promise.resolve(this.groupedServers);
     }
     return new Promise((resolve, reject)=>{
       this.api.get(url_for('sqleditor.get_new_connection_servers'))
         .then(({data: respData})=>{
+          // Sort the server list
+          respData.data.result.server_list.Servers?.sort(function (a, b) {
+            return obj.pgAdmin.natural_sort(a.label, b.label);
+          });
           let groupedOptions = [];
           _.forIn(respData.data.result.server_list, (v, k)=>{
             if(v.length == 0) {
@@ -132,46 +147,53 @@ class AdHocConnectionSchema extends BaseUISchema {
     let self = this;
     return [
       {
-        id: 'sid', label: gettext('Existing Server (Optional)'), deps: ['connected'],
-        type: () => ({
+        id: 'sid', label: gettext('Existing Server (Optional)'), deps: ['connected', 'connection_refresh'],
+        type: (state) => ({
           type: 'select',
           options: () => self.getServerList(),
           optionsLoaded: (res) => self.flatServers = flattenSelectOptions(res),
-          optionsReloadBasis: self.flatServers.map((s) => s.connected).join(''),
+          optionsReloadBasis: `${self.flatServers.map((s) => s.connected).join('')}${state.connection_refresh}`,
         }),
-        depChange: (state)=>{
-          /* Once the option is selected get the name */
-          /* Force sid to null, and set only if connected */
+        depChange: (state, source)=>{
+          // Check for connection status
           let selectedServer = _.find(
             self.flatServers, (s) => s.value == state.sid
           );
+          if(source.includes('connection_refresh')) {
+            return {
+              connected: selectedServer?.connected
+            };
+          }
           return {
-            server_name: selectedServer?.label,
+            server_name: null,
             did: null,
             user: null,
             role: null,
             sid: null,
-            host: selectedServer?.host,
-            port: selectedServer?.port,
-            service: selectedServer?.service,
-            connection_params: selectedServer?.connection_params,
+            host: null,
+            port: null,
+            service: null,
+            connection_params: null,
+            password: null,
             connected: selectedServer?.connected
           };
         },
         deferredDepChange: (state, source, topState, actionObj) => {
+          if(source.includes('connection_refresh')) return;
           return new Promise((resolve) => {
             let sid = actionObj.value;
             let selectedServer = _.find(self.flatServers, (s)=>s.value==sid);
             if(sid && !_.find(self.flatServers, (s) => s.value == sid)?.connected) {
               this.connectExistingServer(sid, state.user, null, (data) => {
                 self.setServerConnected(sid, data.icon);
-                resolve(() => ({ sid: sid, host: selectedServer?.host,
+                selectedServer.connected = true;
+                resolve(() => ({ sid: sid, server_name:selectedServer?.label, host: selectedServer?.host,
                   port: selectedServer?.port, service: selectedServer?.service,
                   connection_params: selectedServer?.connection_params, connected: true
                 }));
               });
             } else {
-              resolve(()=>({ sid: sid, host: selectedServer?.host,
+              resolve(()=>({ sid: sid, server_name:selectedServer?.label, host: selectedServer?.host,
                 port: selectedServer?.port, service: selectedServer?.service,
                 connection_params: selectedServer?.connection_params, connected: true
               }));
@@ -193,11 +215,11 @@ class AdHocConnectionSchema extends BaseUISchema {
         disabled: (state) => state.sid,
       },{
         id: 'did', label: gettext('Database'), deps: ['sid', 'connected'],
-        noEmpty: true, controlProps: {creatable: true},
         type: (state) => {
           if (state?.sid) {
             return {
               type: 'select',
+              controlProps: {creatable: true},
               options: () => this.getOtherOptions(
                 state.sid, 'get_new_connection_database'
               ),
@@ -207,7 +229,6 @@ class AdHocConnectionSchema extends BaseUISchema {
             return {type: 'text'};
           }
         },
-        optionsLoaded: (res) => this.dbs = res,
         depChange: (state) => {
           /* Once the option is selected get the name */
           return {
@@ -216,11 +237,11 @@ class AdHocConnectionSchema extends BaseUISchema {
         }
       }, {
         id: 'user', label: gettext('User'), deps: ['sid', 'connected'],
-        controlProps: {creatable: true},
         type: (state) => {
           if (state?.sid) {
             return {
               type: 'select',
+              controlProps: {creatable: true},
               options: () => this.getOtherOptions(
                 state.sid, 'get_new_connection_user'
               ),
@@ -236,12 +257,17 @@ class AdHocConnectionSchema extends BaseUISchema {
           maxLength: null,
           autoComplete: 'new-password'
         },
-        deps: ['sid', 'connected'],
+        deps: ['sid', 'did', 'user', 'role'],
+        depChange: (state, source)=> {
+          if (source == 'sid' || source == 'did' || source == 'user' ||  source == 'role') {
+            state.password = null;
+          }
+        }
       },{
         id: 'role', label: gettext('Role'), deps: ['sid', 'connected'],
-        controlProps: {creatable: true},
         type: (state)=>({
           type: 'select',
+          controlProps: {creatable: true},
           options: () => this.getOtherOptions(
             state.sid, 'get_new_connection_role'
           ),
@@ -286,15 +312,6 @@ class AdHocConnectionSchema extends BaseUISchema {
           setError('host', null);
         }
       }
-
-      if(isEmptyString(state.username)) {
-        errmsg = gettext('Username must be specified.');
-        setError('username', errmsg);
-        return true;
-      } else {
-        setError('username', null);
-      }
-
       if(isEmptyString(state.port)) {
         errmsg = gettext('Port must be specified.');
         setError('port', errmsg);
@@ -302,8 +319,24 @@ class AdHocConnectionSchema extends BaseUISchema {
       } else {
         setError('port', null);
       }
+
+      if(isEmptyString(state.did)) {
+        errmsg = gettext('Database must be specified.');
+        setError('did', errmsg);
+        return true;
+      } else {
+        setError('did', null);
+      }
+
+      if(isEmptyString(state.user)) {
+        errmsg = gettext('User must be specified.');
+        setError('user', errmsg);
+        return true;
+      } else {
+        setError('user', null);
+      }
     } else {
-      _.each(['host', 'db', 'username', 'port'], (item) => {
+      _.each(['host', 'port', 'did', 'user'], (item) => {
         setError(item, null);
       });
     }
@@ -312,14 +345,13 @@ class AdHocConnectionSchema extends BaseUISchema {
 }
 
 export default function AdHocConnection({mode}) {
-  const [connecting, setConnecting] = useState(false);
   const api = getApiInstance();
   const modal = useModal();
   const pgAdmin = usePgAdmin();
   const preferencesStore = usePreferences();
+  const {currentWorkspace} = useWorkspace();
 
   const connectExistingServer = async (sid, user, formData, connectCallback) => {
-    setConnecting(true);
     try {
       let {data: respData} = await api({
         method: 'POST',
@@ -332,7 +364,6 @@ export default function AdHocConnection({mode}) {
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
         data: formData
       });
-      setConnecting(false);
       connectCallback?.(respData.data);
     } catch (error) {
       if(!error.response) {
@@ -342,7 +373,6 @@ export default function AdHocConnection({mode}) {
           return (
             <ConnectServerContent
               closeModal={()=>{
-                setConnecting(false);
                 closeModal();
               }}
               data={error.response?.data?.result}
@@ -424,7 +454,7 @@ export default function AdHocConnection({mode}) {
       'pgadmin:tool:show',
       `${BROWSER_PANELS.PSQL_TOOL}_${transId}`,
       openUrl,
-      {title: escapedTitle, db: db_name},
+      {title: escapedTitle, db: db_name, server_name: formData.server_name, 'user': user_name},
       {title: panelTitle, icon: 'pg-font-icon icon-terminal', manualClose: false, renamable: true},
       Boolean(open_new_tab?.includes('psql_tool'))
     );
@@ -439,10 +469,9 @@ export default function AdHocConnection({mode}) {
         url: url_for('workspace.adhoc_connect_server'),
         data: JSON.stringify(formData)
       });
-
-      if (mode == 'Query Tool') {
+      if (mode == WORKSPACES.QUERY_TOOL) {
         openQueryTool(respData, formData);
-      } else if (mode == 'PSQL') {
+      } else if (mode == WORKSPACES.PSQL_TOOL && pgAdmin['enable_psql']) {
         openPSQLTool(respData, formData);
       }
     } catch (error) {
@@ -459,6 +488,7 @@ export default function AdHocConnection({mode}) {
               data={error.response?.data?.result}
               onOK={(okFormData)=>{
                 formData['password'] = okFormData.get('password');
+                formData['tunnel_password'] = okFormData.get('tunnel_password');
                 onSaveClick(isNew, formData);
               }}
               hideSavePassword={true}
@@ -470,11 +500,15 @@ export default function AdHocConnection({mode}) {
   };
 
   let saveBtnName = gettext('Connect & Open Query Tool');
-  if (mode == 'PSQL') {
+  if (mode == WORKSPACES.PSQL_TOOL) {
     saveBtnName = gettext('Connect & Open PSQL');
   }
 
-  let adHocConObj = useMemo(() => new AdHocConnectionSchema(connectExistingServer), []);
+  let adHocConObj = useMemo(() => new AdHocConnectionSchema(connectExistingServer, pgAdmin), []);
+
+  useEffect(()=>{
+    if(currentWorkspace == mode) adHocConObj.refreshServerList();
+  }, [currentWorkspace]);
 
   return <SchemaView
     formType={'dialog'}
@@ -484,7 +518,7 @@ export default function AdHocConnection({mode}) {
     viewHelperProps={{
       mode: 'create',
     }}
-    loadingText={connecting ? 'Connecting...' : ''}
+    loadingText={'Connecting...'}
     onSave={onSaveClick}
     customSaveBtnName= {saveBtnName}
     customCloseBtnName={''}

@@ -2,7 +2,7 @@
 //
 // pgAdmin 4 - PostgreSQL Tools
 //
-// Copyright (C) 2013 - 2024, The pgAdmin Development Team
+// Copyright (C) 2013 - 2025, The pgAdmin Development Team
 // This software is released under the PostgreSQL Licence
 //
 //////////////////////////////////////////////////////////////////////////
@@ -80,29 +80,8 @@ function shortcut_accesskey_title(title, shortcut) {
 }
 
 
-function _stopEventPropagation(event) {
-  event.cancelBubble = true;
-  event.preventDefault();
-  event.stopPropagation();
-  event.stopImmediatePropagation();
-}
-
-/* Function use to validate shortcut keys */
-function validateShortcutKeys(user_defined_shortcut, event) {
-  if(!user_defined_shortcut) {
-    return false;
-  }
-
-  let keyCode = event.which || event.keyCode;
-  return user_defined_shortcut.alt == event.altKey &&
-    user_defined_shortcut.shift == event.shiftKey &&
-    user_defined_shortcut.control == event.ctrlKey &&
-    user_defined_shortcut.key.key_code == keyCode;
-}
-
 export {
-  validateShortcutKeys,
-  _stopEventPropagation, isMac, isKeyCtrlAlt, isKeyAltShift, isKeyCtrlShift,
+  isMac, isKeyCtrlAlt, isKeyAltShift, isKeyCtrlShift,
   isKeyCtrlAltShift, isAltShiftBoth, isCtrlShiftBoth, isCtrlAltBoth,
   shortcut_key, shortcut_title, shortcut_accesskey_title,
 };

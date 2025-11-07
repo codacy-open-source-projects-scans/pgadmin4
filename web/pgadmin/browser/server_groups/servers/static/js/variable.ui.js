@@ -2,7 +2,7 @@
 //
 // pgAdmin 4 - PostgreSQL Tools
 //
-// Copyright (C) 2013 - 2024, The pgAdmin Development Team
+// Copyright (C) 2013 - 2025, The pgAdmin Development Team
 // This software is released under the PostgreSQL Licence
 //
 //////////////////////////////////////////////////////////////
@@ -139,6 +139,14 @@ export default class VariableSchema extends BaseUISchema {
           dialogType: 'select_file',
           supportedTypes: ['*'],
           placeholder: this.getPlaceHolderMsg(variable)
+        }
+      };
+    case 'password':
+      return {
+        cell: 'password',
+        controlProps: {
+          maxLength: null,
+          autoComplete: 'new-password'
         }
       };
     default:

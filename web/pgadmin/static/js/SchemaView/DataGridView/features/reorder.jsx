@@ -2,12 +2,12 @@
 //
 // pgAdmin 4 - PostgreSQL Tools
 //
-// Copyright (C) 2013 - 2024, The pgAdmin Development Team
+// Copyright (C) 2013 - 2025, The pgAdmin Development Team
 // This software is released under the PostgreSQL Licence
 //
 //////////////////////////////////////////////////////////////
 
-import React, { useRef } from 'react';
+import { useRef } from 'react';
 import { useDrag, useDrop } from 'react-dnd';
 import DragIndicatorRoundedIcon from '@mui/icons-material/DragIndicatorRounded';
 
@@ -55,7 +55,7 @@ export default class Reorder extends Feature {
         <div
           className='reorder-cell'
           data-handler-id={handlerId}
-          ref={dragHandleRef ? dragHandleRef : null}>
+          ref={dragHandleRef || null}>
           <DragIndicatorRoundedIcon fontSize="small" />
         </div>
       );

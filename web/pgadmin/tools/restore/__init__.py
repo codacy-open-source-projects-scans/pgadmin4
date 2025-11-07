@@ -2,7 +2,7 @@
 #
 # pgAdmin 4 - PostgreSQL Tools
 #
-# Copyright (C) 2013 - 2024, The pgAdmin Development Team
+# Copyright (C) 2013 - 2025, The pgAdmin Development Team
 # This software is released under the PostgreSQL Licence
 #
 ##########################################################################
@@ -15,7 +15,7 @@ from flask import render_template, request, current_app, Response
 from flask_babel import gettext as _
 # This unused import is required as API test cases will fail if we remove it,
 # Have to identify the cause and then remove it.
-from flask_security import current_user
+from flask_security import current_user, permissions_required
 from pgadmin.user_login_check import pga_login_required
 from pgadmin.misc.bgprocess.processes import BatchProcess, IProcessDesc
 from pgadmin.utils import PgAdminModule, fs_short_path, does_utility_exist, \
@@ -25,6 +25,7 @@ from pgadmin.utils.ajax import make_json_response, bad_request, \
 
 from config import PG_DEFAULT_DRIVER
 from pgadmin.utils.constants import MIMETYPE_APP_JS, SERVER_NOT_FOUND
+from pgadmin.tools.user_management.PgAdminPermissions import AllPermissionTypes
 
 # set template path for sql scripts
 MODULE_NAME = 'restore'
@@ -117,19 +118,6 @@ def index():
     return bad_request(errormsg=_("This URL cannot be called directly."))
 
 
-@blueprint.route("/restore.js")
-@pga_login_required
-def script():
-    """render own javascript"""
-    return Response(
-        response=render_template(
-            "restore/js/restore.js", _=_
-        ),
-        status=200,
-        mimetype=MIMETYPE_APP_JS
-    )
-
-
 def _get_create_req_data():
     """
     Get data from request for create restore job.
@@ -141,18 +129,18 @@ def _get_create_req_data():
         data = json.loads(request.data)
 
     try:
-        _file = filename_with_file_manager_path(data['file'])
+        filepath = filename_with_file_manager_path(data['file'])
     except Exception as e:
         return True, internal_server_error(errormsg=str(e)), data, None
 
-    if _file is None:
+    if filepath is None:
         return True, make_json_response(
             status=410,
             success=0,
             errormsg=_("File could not be found.")
-        ), data, _file
+        ), data, filepath
 
-    return False, '', data, _file
+    return False, '', data, filepath
 
 
 def _connect_server(sid):
@@ -263,15 +251,15 @@ def set_multiple(key, param, data, args, driver, conn, with_schema=True):
     return False
 
 
-def _set_args_param_values(data, manager, server, driver, conn, _file):
+def get_restore_util_args(data, manager, server, driver, conn, filepath):
     """
-    add args to the list.
+    return the args for the command
     :param data: Data.
     :param manager: Manager.
     :param server: Server.
     :param driver: Driver.
     :param conn: Connection.
-    :param _file: File.
+    :param filepath: File.
     :return: args list.
     """
     args = []
@@ -347,12 +335,58 @@ def _set_args_param_values(data, manager, server, driver, conn, _file):
                      False)
         set_multiple('indexes', '--index', data, args, driver, conn, False)
 
-    args.append(fs_short_path(_file))
+    args.append(fs_short_path(filepath))
 
     return args
 
 
+def get_sql_util_args(data, manager, server, filepath):
+    """
+    return the args for the command
+    :param data: Data.
+    :param manager: Manager.
+    :param server: Server.
+    :param filepath: File.
+    :return: args list.
+    """
+    args = [
+        '--host',
+        manager.local_bind_host if manager.use_ssh_tunnel else server.host,
+        '--port',
+        str(manager.local_bind_port) if manager.use_ssh_tunnel
+        else str(server.port),
+        '--username', server.username, '--dbname',
+        data['database'],
+        '--file', fs_short_path(filepath)
+    ]
+
+    return args
+
+
+def use_restore_utility(data, manager, server, driver, conn, filepath):
+    utility = manager.utility('restore')
+    ret_val = does_utility_exist(utility)
+    if ret_val:
+        return ret_val, None, None
+
+    args = get_restore_util_args(data, manager, server, driver, conn, filepath)
+
+    return None, utility, args
+
+
+def use_sql_utility(data, manager, server, filepath):
+    utility = manager.utility('sql')
+    ret_val = does_utility_exist(utility)
+    if ret_val:
+        return ret_val, None, None
+
+    args = get_sql_util_args(data, manager, server, filepath)
+
+    return None, utility, args
+
+
 @blueprint.route('/job/<int:sid>', methods=['POST'], endpoint='create_job')
+@permissions_required(AllPermissionTypes.tools_restore)
 @pga_login_required
 def create_restore_job(sid):
     """
@@ -364,7 +398,7 @@ def create_restore_job(sid):
     Returns:
         None
     """
-    is_error, errmsg, data, _file = _get_create_req_data()
+    is_error, errmsg, data, filepath = _get_create_req_data()
     if is_error:
         return errmsg
 
@@ -372,15 +406,18 @@ def create_restore_job(sid):
     if is_error:
         return errmsg
 
-    utility = manager.utility('restore')
-    ret_val = does_utility_exist(utility)
-    if ret_val:
+    if data['format'] == 'plain':
+        error_msg, utility, args = use_sql_utility(
+            data, manager, server, filepath)
+    else:
+        error_msg, utility, args = use_restore_utility(
+            data, manager, server, driver, conn, filepath)
+
+    if error_msg is not None:
         return make_json_response(
             success=0,
-            errormsg=ret_val
+            errormsg=error_msg
         )
-
-    args = _set_args_param_values(data, manager, server, driver, conn, _file)
 
     try:
         p = BatchProcess(

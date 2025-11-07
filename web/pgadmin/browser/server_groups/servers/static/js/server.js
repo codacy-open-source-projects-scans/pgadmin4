@@ -2,7 +2,7 @@
 //
 // pgAdmin 4 - PostgreSQL Tools
 //
-// Copyright (C) 2013 - 2024, The pgAdmin Development Team
+// Copyright (C) 2013 - 2025, The pgAdmin Development Team
 // This software is released under the PostgreSQL Licence
 //
 //////////////////////////////////////////////////////////////
@@ -12,6 +12,7 @@ import ServerSchema from './server.ui';
 import { showServerPassword, showChangeServerPassword, showNamedRestorePoint } from '../../../../../static/js/Dialogs/index';
 import _ from 'lodash';
 import getApiInstance, { parseApiError } from '../../../../../static/js/api_instance';
+import { AllPermissionTypes } from '../../../../static/js/constants';
 
 define('pgadmin.node.server', [
   'sources/gettext', 'sources/url_for',
@@ -81,7 +82,7 @@ define('pgadmin.node.server', [
           name: 'create_server_on_sg', node: 'server_group', module: this,
           applies: ['object', 'context'], callback: 'show_obj_properties',
           category: 'register', priority: 1, label: gettext('Server...'),
-          data: {action: 'create'}, enable: 'canCreate',
+          data: {action: 'create'}, enable: 'canCreate', permission: AllPermissionTypes.OBJECT_REGISTER_SERVER
         },{
           name: 'disconnect_all_servers', node: 'server_group', module: this,
           applies: ['object','context'], callback: 'disconnect_all_servers',
@@ -91,7 +92,8 @@ define('pgadmin.node.server', [
           name: 'create_server', node: 'server', module: this,
           applies: ['object', 'context'], callback: 'show_obj_properties',
           category: 'register', priority: 3, label: gettext('Server...'),
-          data: {action: 'create'}, enable: 'canCreate',
+          shortcut_preference: ['browser', 'sub_menu_create'],
+          data: {action: 'create'}, enable: 'canCreate', permission: AllPermissionTypes.OBJECT_REGISTER_SERVER
         },{
           name: 'connect_server', node: 'server', module: this,
           applies: ['object', 'context'], callback: 'connect_server',
@@ -167,7 +169,7 @@ define('pgadmin.node.server', [
           name: 'copy_server', node: 'server', module: this,
           applies: ['object', 'context'], callback: 'show_obj_properties',
           label: gettext('Copy Server...'), data: {action: 'copy'},
-          priority: 4,
+          priority: 4, permission: AllPermissionTypes.OBJECT_REGISTER_SERVER,
         }]);
 
         _.bindAll(this, 'connection_lost');
@@ -261,6 +263,7 @@ define('pgadmin.node.server', [
               function() { return true;},
               gettext('Disconnect'),
               gettext('Cancel'),
+              'disconnect'
             );
           }
           return false;
@@ -696,6 +699,13 @@ define('pgadmin.node.server', [
              To make sure all the menus for database is in the right state */
             pgBrowser.enable_disable_menus(_item);
 
+            /* Below code is added to show the error message if
+               connection is successful, but there is an error to
+               run the post connection sql queries. */
+            if (res?.errormsg) {
+              pgAdmin.Browser.notifier.error(res.errormsg, null);
+            }
+
             // We're not reconnecting
             if (!_wasConnected) {
               _tree.setInode(_item);
@@ -868,7 +878,8 @@ define('pgadmin.node.server', [
           function() { disconnect(); },
           function() { return true;},
           gettext('Disconnect'),
-          gettext('Cancel')
+          gettext('Cancel'),
+          'disconnect'
         );
       } else {
         disconnect();

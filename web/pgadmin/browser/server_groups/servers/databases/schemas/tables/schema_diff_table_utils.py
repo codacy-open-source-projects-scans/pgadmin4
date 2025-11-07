@@ -2,7 +2,7 @@
 #
 # pgAdmin 4 - PostgreSQL Tools
 #
-# Copyright (C) 2013 - 2024, The pgAdmin Development Team
+# Copyright (C) 2013 - 2025, The pgAdmin Development Team
 # This software is released under the PostgreSQL Licence
 #
 ##########################################################################
@@ -219,7 +219,8 @@ class SchemaDiffTableCompare(SchemaDiffObjectCompare):
                              'unique_constraint': ['col_count',
                                                    'condeferrable',
                                                    'condeffered',
-                                                   'columns'],
+                                                   'columns',
+                                                   'indnullsnotdistinct'],
                              'check_constraint': ['consrc'],
                              'exclude_constraint': ['amname',
                                                     'indconstraint',
@@ -227,7 +228,7 @@ class SchemaDiffTableCompare(SchemaDiffObjectCompare):
                              'foreign_key': ['condeferrable', 'condeferred',
                                              'confupdtype', 'confdeltype',
                                              'confmatchtype', 'convalidated',
-                                             'conislocal']
+                                             'conislocal', 'refnsp', 'reftab']
                              }
 
         for constraint in ['primary_key', 'unique_constraint',
@@ -300,6 +301,7 @@ class SchemaDiffTableCompare(SchemaDiffObjectCompare):
         target = kwargs.get('target')
         diff_dict = kwargs.get('diff_dict')
         ignore_whitespaces = kwargs.get('ignore_whitespaces')
+        ignore_tablespace = kwargs.get('ignore_tablespace')
 
         # Get the difference result for source and target columns
         col_diff = self.table_col_comp(source, target)
@@ -364,7 +366,8 @@ class SchemaDiffTableCompare(SchemaDiffObjectCompare):
                         "source": source,
                         "target": target,
                         "target_schema": target_schema,
-                        "ignore_whitespaces": ignore_whitespaces
+                        "ignore_whitespaces": ignore_whitespaces,
+                        "ignore_tablespace": ignore_tablespace
                     }
                     diff = self._compare_source_and_target(
                         intersect_keys, module_view, source_params,
@@ -413,11 +416,17 @@ class SchemaDiffTableCompare(SchemaDiffObjectCompare):
         target = kwargs['target']
         target_schema = kwargs['target_schema']
         ignore_whitespaces = kwargs.get('ignore_whitespaces')
+        ignore_tablespace = kwargs.get('ignore_tablespace')
+        temp_ignore_key = self.keys_to_ignore
+        # if ignore_tablespace is True then add all the possible tablespace
+        # keys to the ignore keys.
+        if ignore_tablespace:
+            temp_ignore_key = temp_ignore_key + ['spcname', 'spcoid']
 
         for key in intersect_keys:
             # Recursively Compare the two dictionary
             if not are_dictionaries_identical(
-                    dict1[key], dict2[key], self.keys_to_ignore,
+                    dict1[key], dict2[key], temp_ignore_key,
                     ignore_whitespaces):
                 diff_ddl = module_view.ddl_compare(
                     source_params=source_params,

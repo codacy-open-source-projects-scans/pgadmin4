@@ -3,7 +3,7 @@
 //
 // pgAdmin 4 - PostgreSQL Tools
 //
-// Copyright (C) 2013 - 2024, The pgAdmin Development Team
+// Copyright (C) 2013 - 2025, The pgAdmin Development Team
 // This software is released under the PostgreSQL Licence
 //
 //////////////////////////////////////////////////////////////
@@ -18,15 +18,16 @@ import pgBrowser from 'pgadmin.browser';
 import 'pgadmin.tools.user_management';
 import 'pgadmin.tools.file_manager';
 import gettext from 'sources/gettext';
-import React from 'react';
 import ReactDOM from 'react-dom/client';
 import QueryToolComponent from './components/QueryToolComponent';
 import ModalProvider from '../../../../static/js/helpers/ModalProvider';
 import Theme from '../../../../static/js/Theme';
-import { BROWSER_PANELS } from '../../../../browser/static/js/constants';
+import { AllPermissionTypes, BROWSER_PANELS, WORKSPACES } from '../../../../browser/static/js/constants';
 import { NotifierProvider } from '../../../../static/js/helpers/Notifier';
 import usePreferences, { listenPreferenceBroadcast } from '../../../../preferences/static/js/store';
 import { PgAdminProvider } from '../../../../static/js/PgAdminProvider';
+import { ApplicationStateProvider } from '../../../../settings/static/ApplicationStateProvider';
+import ToolErrorView from '../../../../static/js/ToolErrorView';
 
 export default class SQLEditor {
   static instance;
@@ -104,6 +105,8 @@ export default class SQLEditor {
         applies: 'tools',
         data_disabled: gettext('Please select a database from the object explorer to access Query Tool.'),
       },
+      permission: AllPermissionTypes.TOOLS_QUERY_TOOL,
+      shortcut_preference: ['browser', 'sub_menu_query_tool'],
     }];
 
     // Create context menu
@@ -121,6 +124,8 @@ export default class SQLEditor {
         category: 'view_data',
         priority: 101,
         label: gettext('All Rows'),
+        permission: AllPermissionTypes.TOOLS_QUERY_TOOL,
+        shortcut_preference: ['browser', 'sub_menu_view_data'],
       }, {
         name: 'view_first_100_rows_context_' + supportedNode,
         node: supportedNode,
@@ -134,6 +139,7 @@ export default class SQLEditor {
         category: 'view_data',
         priority: 102,
         label: gettext('First 100 Rows'),
+        permission: AllPermissionTypes.TOOLS_QUERY_TOOL,
       }, {
         name: 'view_last_100_rows_context_' + supportedNode,
         node: supportedNode,
@@ -147,6 +153,7 @@ export default class SQLEditor {
         category: 'view_data',
         priority: 103,
         label: gettext('Last 100 Rows'),
+        permission: AllPermissionTypes.TOOLS_QUERY_TOOL,
       }, {
         name: 'view_filtered_rows_context_' + supportedNode,
         node: supportedNode,
@@ -160,6 +167,7 @@ export default class SQLEditor {
         category: 'view_data',
         priority: 104,
         label: gettext('Filtered Rows...'),
+        permission: AllPermissionTypes.TOOLS_QUERY_TOOL,
       });
     }
 
@@ -213,15 +221,13 @@ export default class SQLEditor {
     let browser_preferences = usePreferences.getState().getPreferencesForModule('browser');
     let open_new_tab = browser_preferences.new_browser_tab_open;
     const [icon, tooltip] = panelTitleFunc.getQueryToolIcon(panel_title, is_query_tool);
-    let selectedNodeInfo = pgAdmin.Browser.tree.getTreeNodeHierarchy(
-      pgAdmin.Browser.tree.selected()
-    );
+    let selectedNodeInfo = pgAdmin.Browser.tree?.selected() ? pgAdmin.Browser.tree?.getTreeNodeHierarchy(pgAdmin.Browser.tree.selected()) : null;
 
     pgAdmin.Browser.Events.trigger(
       'pgadmin:tool:show',
       `${BROWSER_PANELS.QUERY_TOOL}_${trans_id}`,
       panel_url,
-      {...params, title: _.escape(panel_title.replace('\\', '\\\\')), selectedNodeInfo: JSON.stringify(selectedNodeInfo)},
+      {...params, title: panel_title, selectedNodeInfo: JSON.stringify(selectedNodeInfo)},
       {title: panel_title, icon: icon, tooltip: tooltip, renamable: true},
       Boolean(open_new_tab?.includes('qt'))
     );
@@ -229,18 +235,37 @@ export default class SQLEditor {
   }
 
   async loadComponent(container, params) {
-    const selectedNodeInfo = params.selectedNodeInfo ? JSON.parse(params.selectedNodeInfo) : params.selectedNodeInfo;
+    let panelDocker = pgWindow.pgAdmin.Browser.docker.query_tool_workspace;
+    if ((params.restore != 'true' && pgWindow.pgAdmin.Browser.docker.currentWorkspace == WORKSPACES.DEFAULT) ||
+        (params.restore == 'true' && params.workSpace == WORKSPACES.DEFAULT)) {
+      panelDocker = pgWindow.pgAdmin.Browser.docker.default_workspace;
+    }
+
+    const selectedNodeInfo = params.selectedNodeInfo ? JSON.parse(_.unescape(params.selectedNodeInfo)) : params.selectedNodeInfo;
     pgAdmin.Browser.keyboardNavigation.init();
     await listenPreferenceBroadcast();
     const root = ReactDOM.createRoot(container);
     root.render(
       <Theme>
         <PgAdminProvider value={pgAdmin}>
-          <ModalProvider>
-            <NotifierProvider pgAdmin={pgAdmin} pgWindow={pgWindow} />
-            <QueryToolComponent params={params} pgWindow={pgWindow} pgAdmin={pgAdmin} qtPanelDocker={pgWindow.pgAdmin.Browser.docker.query_tool_workspace}
-              qtPanelId={`${BROWSER_PANELS.QUERY_TOOL}_${params.trans_id}`} selectedNodeInfo={selectedNodeInfo}/>
-          </ModalProvider>
+          <ApplicationStateProvider>
+            <ModalProvider>
+              <NotifierProvider pgAdmin={pgAdmin} pgWindow={pgWindow} />
+              { params.error ?   
+                <ToolErrorView 
+                  error={params.error}
+                  panelId={`${BROWSER_PANELS.QUERY_TOOL}_${params.trans_id}`}
+                  panelDocker={panelDocker}
+                /> :
+                <QueryToolComponent params={params} 
+                  pgWindow={pgWindow} 
+                  pgAdmin={pgAdmin} 
+                  qtPanelDocker={panelDocker}
+                  qtPanelId={`${BROWSER_PANELS.QUERY_TOOL}_${params.trans_id}`} 
+                  selectedNodeInfo={selectedNodeInfo}
+                />}
+            </ModalProvider>
+          </ApplicationStateProvider>
         </PgAdminProvider>
       </Theme>
     );

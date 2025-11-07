@@ -2,7 +2,7 @@
 //
 // pgAdmin 4 - PostgreSQL Tools
 //
-// Copyright (C) 2013 - 2024, The pgAdmin Development Team
+// Copyright (C) 2013 - 2025, The pgAdmin Development Team
 // This software is released under the PostgreSQL Licence
 //
 //////////////////////////////////////////////////////////////
@@ -21,9 +21,9 @@ import AssessmentRoundedIcon from '@mui/icons-material/AssessmentRounded';
 import ExplicitRoundedIcon from '@mui/icons-material/ExplicitRounded';
 import FormatListNumberedRoundedIcon from '@mui/icons-material/FormatListNumberedRounded';
 import HelpIcon from '@mui/icons-material/HelpRounded';
-import {QUERY_TOOL_EVENTS, CONNECTION_STATUS} from '../QueryToolConstants';
+import {QUERY_TOOL_EVENTS, CONNECTION_STATUS, MODAL_DIALOGS} from '../QueryToolConstants';
 import { QueryToolConnectionContext, QueryToolContext, QueryToolEventsContext } from '../QueryToolComponent';
-import { PgMenu, PgMenuDivider, PgMenuItem, usePgMenuGroup } from '../../../../../../static/js/components/Menu';
+import { PgMenu, PgMenuDivider, PgMenuItem, usePgMenuGroup, PgSubMenu} from '../../../../../../static/js/components/Menu';
 import gettext from 'sources/gettext';
 import { useKeyboardShortcuts } from '../../../../../../static/js/custom_hooks';
 import url_for from 'sources/url_for';
@@ -45,7 +45,7 @@ const StyledBox = styled(Box)(({theme}) => ({
   ...theme.mixins.panelBorder.bottom,
 }));
 
-function autoCommitRollback(type, api, transId, value) {
+function changeQueryExecutionSettings(type, api, transId, value) {
   let url = url_for(`sqleditor.${type}`, {
     'trans_id': transId,
   });
@@ -56,6 +56,7 @@ export function MainToolBar({containerRef, onFilterClick, onManageMacros, onAddT
   const eventBus = useContext(QueryToolEventsContext);
   const queryToolCtx = useContext(QueryToolContext);
   const queryToolConnCtx = useContext(QueryToolConnectionContext);
+  const modalId = MODAL_DIALOGS.QT_CONFIRMATIONS;
 
   const [highlightFilter, setHighlightFilter] = useState(false);
   const [limit, setLimit] = useState('-1');
@@ -74,6 +75,7 @@ export function MainToolBar({containerRef, onFilterClick, onManageMacros, onAddT
   const [checkedMenuItems, setCheckedMenuItems] = React.useState({});
   /* Menu button refs */
   const saveAsMenuRef = React.useRef(null);
+  const openInNewTabMenuRef = React.useRef(null);
   const editMenuRef = React.useRef(null);
   const autoCommitMenuRef = React.useRef(null);
   const explainMenuRef = React.useRef(null);
@@ -81,6 +83,7 @@ export function MainToolBar({containerRef, onFilterClick, onManageMacros, onAddT
   const filterMenuRef = React.useRef(null);
 
   const queryToolPref = queryToolCtx.preferences.sqleditor;
+  const editorPref = queryToolCtx.preferences.editor;
   const setDisableButton = useCallback((name, disable=true)=>{
     setButtonsDisabled((prev)=>({...prev, [name]: disable}));
   }, []);
@@ -110,6 +113,10 @@ export function MainToolBar({containerRef, onFilterClick, onManageMacros, onAddT
       summary: Boolean(checkedMenuItems['explain_summary']),
       settings: Boolean(checkedMenuItems['explain_settings']),
       wal: analyze ? Boolean(checkedMenuItems['explain_wal']) : false,
+      generic_plan: analyze ? false: Boolean(checkedMenuItems['explain_generic_plan']),
+      memory: Boolean(checkedMenuItems['explain_memory']),
+      serialize_binary: analyze ? Boolean(checkedMenuItems['explain_serialize_binary']) : false,
+      serialize_text: analyze ? Boolean(checkedMenuItems['explain_serialize_text']) : false,
     });
   }, [checkedMenuItems]);
 
@@ -120,8 +127,11 @@ export function MainToolBar({containerRef, onFilterClick, onManageMacros, onAddT
   const checkMenuClick = useCallback((e)=>{
     setCheckedMenuItems((prev)=>{
       let newVal = !prev[e.value];
-      if(e.value === 'auto_commit' || e.value === 'auto_rollback') {
-        autoCommitRollback(e.value, queryToolCtx.api, queryToolCtx.params.trans_id, newVal)
+      if (e.value === 'server_cursor') {
+        queryToolCtx.updateServerCursor({server_cursor: newVal});
+      }
+      if(e.value === 'auto_commit' || e.value === 'auto_rollback' || e.value === 'server_cursor') {
+        changeQueryExecutionSettings(e.value, queryToolCtx.api, queryToolCtx.params.trans_id, newVal)
           .catch ((error)=>{
             newVal = prev[e.value];
             eventBus.fireEvent(QUERY_TOOL_EVENTS.HANDLE_API_ERROR, error, {
@@ -129,18 +139,27 @@ export function MainToolBar({containerRef, onFilterClick, onManageMacros, onAddT
             });
           });
       }
+
+      let otherVars = {};
+      if (e.value === 'explain_serialize_binary' && newVal) {
+        otherVars = { 'explain_serialize_text': false };
+      } else if (e.value === 'explain_serialize_text' && newVal) {
+        otherVars = { 'explain_serialize_binary': false };
+      }
+
       return {
         ...prev,
         [e.value]: newVal,
+        ...otherVars,
       };
     });
   }, []);
 
   const openFile = useCallback(()=>{
     confirmDiscard(()=>{
-      eventBus.fireEvent(QUERY_TOOL_EVENTS.TRIGGER_LOAD_FILE);
+      eventBus.fireEvent(QUERY_TOOL_EVENTS.TRIGGER_LOAD_FILE, Boolean(checkedMenuItems['open_in_new_tab']));
     }, true);
-  }, [buttonsDisabled['save']]);
+  }, [buttonsDisabled['save'], checkedMenuItems]);
 
   const saveFile = useCallback((saveAs=false)=>{
     eventBus.fireEvent(QUERY_TOOL_EVENTS.TRIGGER_SAVE_FILE, saveAs);
@@ -236,18 +255,24 @@ export function MainToolBar({containerRef, onFilterClick, onManageMacros, onAddT
               eventBus.fireEvent(QUERY_TOOL_EVENTS.FORCE_CLOSE_PANEL);
             }}
           />
-        ));
+        ), {id: modalId});
         return;
       } else {
         eventBus.fireEvent(QUERY_TOOL_EVENTS.FORCE_CLOSE_PANEL);
         return;
       }
     }
+    let _confirm_msg = gettext('The current transaction is not committed to the database. '
+        +'Do you want to commit or rollback the transaction?');
+    if (queryToolCtx.server_cursor) {
+      _confirm_msg = gettext('The query was executed with a server-side cursor, '
+        + 'which runs within a transaction.') + _confirm_msg;
+    }
+
     queryToolCtx.modal.showModal(gettext('Commit transaction?'), (closeModal)=>(
       <ConfirmTransactionContent
         closeModal={closeModal}
-        text={gettext('The current transaction is not committed to the database. '
-          +'Do you want to commit or rollback the transaction?')}
+        text={_confirm_msg}
         onRollback={()=>{
           onExecutionDone();
           onRollbackClick();
@@ -257,12 +282,12 @@ export function MainToolBar({containerRef, onFilterClick, onManageMacros, onAddT
           onCommitClick();
         }}
       />
-    ));
+    ), {id: modalId});
   };
   useEffect(()=>{
     if(isInTxn()) {
-      setDisableButton('commit', false);
-      setDisableButton('rollback', false);
+      setDisableButton('commit', queryToolCtx.params.server_cursor && !queryToolCtx.params.is_query_tool);
+      setDisableButton('rollback', queryToolCtx.params.server_cursor && !queryToolCtx.params.is_query_tool);
       setDisableButton('execute-options', true);
     } else {
       setDisableButton('commit', true);
@@ -287,9 +312,6 @@ export function MainToolBar({containerRef, onFilterClick, onManageMacros, onAddT
   const onLimitChange=(e)=>{
     setLimit(e.target.value);
     eventBus.fireEvent(QUERY_TOOL_EVENTS.TRIGGER_SET_LIMIT,e.target.value);
-  };
-  const formatSQL=()=>{
-    eventBus.fireEvent(QUERY_TOOL_EVENTS.TRIGGER_FORMAT_SQL);
   };
   const toggleCase=()=>{
     eventBus.fireEvent(QUERY_TOOL_EVENTS.EDITOR_TOGGLE_CASE);
@@ -337,6 +359,10 @@ export function MainToolBar({containerRef, onFilterClick, onManageMacros, onAddT
           explain_summary: queryToolPref.explain_summary,
           explain_settings: queryToolPref.explain_settings,
           explain_wal: queryToolPref.explain_wal,
+          explain_generic_plan: queryToolPref.explain_generic_plan,
+          explain_memory: queryToolPref.explain_memory,
+          open_in_new_tab: queryToolPref.open_in_new_tab,
+          server_cursor: queryToolPref.server_cursor,
         });
       }
     }
@@ -440,12 +466,6 @@ export function MainToolBar({containerRef, onFilterClick, onManageMacros, onAddT
         callback: ()=>{clearQuery();}
       }
     },
-    {
-      shortcut: queryToolPref.format_sql,
-      options: {
-        callback: ()=>{formatSQL();}
-      }
-    },
   ], containerRef);
 
   /* Macro shortcuts */
@@ -501,6 +521,11 @@ export function MainToolBar({containerRef, onFilterClick, onManageMacros, onAddT
         <PgButtonGroup size="small">
           <PgIconButton title={gettext('Open File')} icon={<FolderRoundedIcon />} disabled={!queryToolCtx.params.is_query_tool}
             shortcut={queryToolPref.btn_open_file} onClick={openFile} />
+          <PgIconButton title={gettext('Open in a new tab')} icon={<KeyboardArrowDownIcon />} splitButton disabled={!queryToolCtx.params.is_query_tool}
+            name="menu-openfileintab" ref={openInNewTabMenuRef} onClick={toggleMenu}
+          />
+        </PgButtonGroup>
+        <PgButtonGroup size="small">
           <PgIconButton title={gettext('Save File')} icon={<SaveRoundedIcon />}
             shortcut={queryToolPref.btn_save_file} disabled={buttonsDisabled['save'] || !queryToolCtx.params.is_query_tool}
             onClick={()=>{saveFile(false);}} />
@@ -563,12 +588,21 @@ export function MainToolBar({containerRef, onFilterClick, onManageMacros, onAddT
         </PgButtonGroup>
       </StyledBox>
       <PgMenu
+        anchorRef={openInNewTabMenuRef}
+        open={openMenuName=='menu-openfileintab'}
+        onClose={onMenuClose}
+        label={gettext('Open file Menu')}
+      >
+        <PgMenuItem hasCheck value="open_in_new_tab" checked={checkedMenuItems['open_in_new_tab']}
+          onClick={checkMenuClick}>{gettext('Open in a new tab?')}</PgMenuItem>
+      </PgMenu>
+      <PgMenu
         anchorRef={saveAsMenuRef}
         open={openMenuName=='menu-saveas'}
         onClose={onMenuClose}
-        label={gettext('File Menu')}
+        label={gettext('Save As')}
       >
-        <PgMenuItem onClick={()=>{saveFile(true);}}>{gettext('Save as')}</PgMenuItem>
+        <PgMenuItem onClick={()=>{saveFile(true);}}>{gettext('Save As')}</PgMenuItem>
       </PgMenu>
       <PgMenu
         anchorRef={editMenuRef}
@@ -576,25 +610,25 @@ export function MainToolBar({containerRef, onFilterClick, onManageMacros, onAddT
         onClose={onMenuClose}
         label={gettext('Edit Menu')}
       >
-        <PgMenuItem shortcut={queryToolPref.find}
+        <PgMenuItem shortcut={editorPref.find}
           onClick={()=>{eventBus.fireEvent(QUERY_TOOL_EVENTS.EDITOR_FIND_REPLACE, false);}}>{gettext('Find')}</PgMenuItem>
-        <PgMenuItem shortcut={queryToolPref.replace}
+        <PgMenuItem shortcut={editorPref.replace}
           onClick={()=>{eventBus.fireEvent(QUERY_TOOL_EVENTS.EDITOR_FIND_REPLACE, true);}}>{gettext('Replace')}</PgMenuItem>
-        <PgMenuItem shortcut={queryToolPref.gotolinecol}
+        <PgMenuItem shortcut={editorPref.goto_line_col}
           onClick={()=>{executeCmd('gotoLineCol');}}>{gettext('Go to Line/Column')}</PgMenuItem>
         <PgMenuDivider />
         <PgMenuItem shortcut={queryToolPref.indent}
           onClick={()=>{executeCmd('indentMore');}}>{gettext('Indent Selection')}</PgMenuItem>
         <PgMenuItem shortcut={queryToolPref.unindent}
           onClick={()=>{executeCmd('indentLess');}}>{gettext('Unindent Selection')}</PgMenuItem>
-        <PgMenuItem shortcut={queryToolPref.comment}
+        <PgMenuItem shortcut={editorPref.comment}
           onClick={()=>{executeCmd('toggleComment');}}>{gettext('Toggle Comment')}</PgMenuItem>
         <PgMenuItem shortcut={queryToolPref.toggle_case}
           onClick={toggleCase}>{gettext('Toggle Case Of Selected Text')}</PgMenuItem>
         <PgMenuItem shortcut={queryToolPref.clear_query}
           onClick={clearQuery}>{gettext('Clear Query')}</PgMenuItem>
         <PgMenuDivider />
-        <PgMenuItem shortcut={queryToolPref.format_sql} onClick={formatSQL}>{gettext('Format SQL')}</PgMenuItem>
+        <PgMenuItem shortcut={editorPref.format_sql} onClick={()=>{executeCmd('formatSql');}}>{gettext('Format SQL')}</PgMenuItem>
       </PgMenu>
       <PgMenu
         anchorRef={filterMenuRef}
@@ -616,6 +650,8 @@ export function MainToolBar({containerRef, onFilterClick, onManageMacros, onAddT
           onClick={checkMenuClick}>{gettext('Auto commit?')}</PgMenuItem>
         <PgMenuItem hasCheck value="auto_rollback" checked={checkedMenuItems['auto_rollback']}
           onClick={checkMenuClick}>{gettext('Auto rollback on error?')}</PgMenuItem>
+        <PgMenuItem hasCheck value="server_cursor" checked={checkedMenuItems['server_cursor']}
+          onClick={checkMenuClick}>{gettext('Use server cursor?')}</PgMenuItem>
       </PgMenu>
       <PgMenu
         anchorRef={explainMenuRef}
@@ -623,18 +659,28 @@ export function MainToolBar({containerRef, onFilterClick, onManageMacros, onAddT
         onClose={onMenuClose}
         label={gettext('Explain Options Menu')}
       >
-        <PgMenuItem hasCheck value="explain_verbose" checked={checkedMenuItems['explain_verbose']}
-          onClick={checkMenuClick}>{gettext('Verbose')}</PgMenuItem>
-        <PgMenuItem hasCheck value="explain_costs" checked={checkedMenuItems['explain_costs']}
-          onClick={checkMenuClick}>{gettext('Costs')}</PgMenuItem>
         <PgMenuItem hasCheck value="explain_buffers" checked={checkedMenuItems['explain_buffers']}
           onClick={checkMenuClick}>{gettext('Buffers')}</PgMenuItem>
-        <PgMenuItem hasCheck value="explain_timing" checked={checkedMenuItems['explain_timing']}
-          onClick={checkMenuClick}>{gettext('Timing')}</PgMenuItem>
-        <PgMenuItem hasCheck value="explain_summary" checked={checkedMenuItems['explain_summary']}
-          onClick={checkMenuClick}>{gettext('Summary')}</PgMenuItem>
+        <PgMenuItem hasCheck value="explain_costs" checked={checkedMenuItems['explain_costs']}
+          onClick={checkMenuClick}>{gettext('Costs')}</PgMenuItem>
+        <PgMenuItem hasCheck value="explain_generic_plan" checked={checkedMenuItems['explain_generic_plan']}
+          onClick={checkMenuClick}>{gettext('Generic Plan')}</PgMenuItem>
+        <PgMenuItem hasCheck value="explain_memory" checked={checkedMenuItems['explain_memory']}
+          onClick={checkMenuClick}>{gettext('Memory')}</PgMenuItem>
+        <PgSubMenu alignCheck key="SERIALIZE" label={gettext('Serialize')}>
+          <PgMenuItem hasCheck value="explain_serialize_text" checked={checkedMenuItems['explain_serialize_text']}
+            onClick={checkMenuClick}>{gettext('Text')}</PgMenuItem>
+          <PgMenuItem hasCheck value="explain_serialize_binary" checked={checkedMenuItems['explain_serialize_binary']}
+            onClick={checkMenuClick}>{gettext('Binary')}</PgMenuItem>
+        </PgSubMenu>
         <PgMenuItem hasCheck value="explain_settings" checked={checkedMenuItems['explain_settings']}
           onClick={checkMenuClick}>{gettext('Settings')}</PgMenuItem>
+        <PgMenuItem hasCheck value="explain_summary" checked={checkedMenuItems['explain_summary']}
+          onClick={checkMenuClick}>{gettext('Summary')}</PgMenuItem>
+        <PgMenuItem hasCheck value="explain_timing" checked={checkedMenuItems['explain_timing']}
+          onClick={checkMenuClick}>{gettext('Timing')}</PgMenuItem>
+        <PgMenuItem hasCheck value="explain_verbose" checked={checkedMenuItems['explain_verbose']}
+          onClick={checkMenuClick}>{gettext('Verbose')}</PgMenuItem>
         <PgMenuItem hasCheck value="explain_wal" checked={checkedMenuItems['explain_wal']}
           onClick={checkMenuClick}>{gettext('Wal')}</PgMenuItem>
       </PgMenu>

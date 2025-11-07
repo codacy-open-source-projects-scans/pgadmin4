@@ -2,7 +2,7 @@
 #
 # pgAdmin 4 - PostgreSQL Tools
 #
-# Copyright (C) 2013 - 2024, The pgAdmin Development Team
+# Copyright (C) 2013 - 2025, The pgAdmin Development Team
 # This software is released under the PostgreSQL Licence
 #
 ##########################################################################
@@ -22,7 +22,8 @@ node_info_dict = {
     "did": [],  # database
     "lrid": [],  # role
     "tsid": [],  # tablespace
-    "scid": []  # schema
+    "scid": [],  # schema
+    "oid": []  # directory
 }
 
 global parent_node_dict
@@ -31,5 +32,6 @@ parent_node_dict = {
     "database": [],
     "tablespace": [],
     "role": [],
-    "schema": []
+    "schema": [],
+    "directory": []
 }

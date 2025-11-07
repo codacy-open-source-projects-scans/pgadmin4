@@ -2,7 +2,7 @@
 //
 // pgAdmin 4 - PostgreSQL Tools
 //
-// Copyright (C) 2013 - 2024, The pgAdmin Development Team
+// Copyright (C) 2013 - 2025, The pgAdmin Development Team
 // This software is released under the PostgreSQL Licence
 //
 //////////////////////////////////////////////////////////////
@@ -10,6 +10,7 @@ import React, {useRef, useEffect, useState, useCallback, useLayoutEffect} from '
 import moment from 'moment';
 import { isMac } from './keyboard_shortcuts';
 import { getBrowser } from './utils';
+import { getCode } from '@fluentui/keyboard-key';
 
 /* React hook for setInterval */
 export function useInterval(callback, delay) {
@@ -28,6 +29,32 @@ export function useInterval(callback, delay) {
     }
   }, [delay]);
 }
+
+/* React hook for handling double and single click events */
+export function useSingleAndDoubleClick(handleSingleClick, handleDoubleClick, delay = 250) {
+  const clickCountRef = useRef(0);
+  const timerRef = useRef(null);
+
+  const handleClick = (e) => {
+    // Handle the logic here, no need to pass the event
+    clickCountRef.current += 1;
+
+    // Clear any previous timeout to ensure the double-click logic is triggered only once
+    clearTimeout(timerRef.current);
+
+    // Set the timeout to handle click logic after the delay
+    timerRef.current = setTimeout(() => {
+      if (clickCountRef.current === 1) handleSingleClick(e);
+      else if (clickCountRef.current === 2) handleDoubleClick(e);
+
+      // Reset the click count and props after handling
+      clickCountRef.current = 0;
+    }, delay);
+  };
+
+  return handleClick;
+}
+
 
 export function useDelayedCaller(callback) {
   let timer;
@@ -159,7 +186,7 @@ export function useKeyboardShortcuts(shortcuts, eleRef) {
 
   const matchFound = (shortcut, e)=>{
     if(!shortcut) return false;
-    let keyCode = e.which || e.keyCode;
+    let keyCode = getCode(e);
     const ctrlKey = (isMac() && shortcut.ctrl_is_meta) ? e.metaKey : e.ctrlKey;
 
     return Boolean(shortcut.alt) == e.altKey &&
@@ -167,9 +194,10 @@ export function useKeyboardShortcuts(shortcuts, eleRef) {
       Boolean(shortcut.control) == ctrlKey &&
       shortcut.key.key_code == keyCode;
   };
+
   useEffect(()=>{
     let ele = eleRef.current ?? document;
-    const keydownCallback = (e)=>{
+    const dispatch = (e)=>{
       Promise.resolve(0).then(()=>{
         let allListeners = _.filter(shortcutsRef.current, (s)=>matchFound(s.shortcut, e));
         for(const {options} of allListeners) {
@@ -183,9 +211,9 @@ export function useKeyboardShortcuts(shortcuts, eleRef) {
         }
       });
     };
-    ele.addEventListener('keydown', keydownCallback);
+    ele.addEventListener('keydown', dispatch);
     return ()=>{
-      ele.removeEventListener('keydown', keydownCallback);
+      ele.removeEventListener('keydown', dispatch);
     };
   }, [eleRef.current]);
 
@@ -220,6 +248,7 @@ export function useBeforeUnload({ enabled, isNewTab, beforeClose, closePanel }) 
   const onBeforeUnloadElectron = useCallback((e)=>{
     e.preventDefault();
     e.returnValue = 'prevent';
+    window.electronUI?.focus();
     beforeClose?.(forceClose);
   }, []);
 

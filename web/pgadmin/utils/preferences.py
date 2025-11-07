@@ -2,7 +2,7 @@
 #
 # pgAdmin 4 - PostgreSQL Tools
 #
-# Copyright (C) 2013 - 2024, The pgAdmin Development Team
+# Copyright (C) 2013 - 2025, The pgAdmin Development Team
 # This software is released under the PostgreSQL Licence
 #
 ##########################################################################
@@ -49,11 +49,11 @@ class _Preference():
         :param label: Display name of the options/preference
         :param _type: Type for proper validation on value
         :param default: Default value
-        :param help_str: Help string to be shown in preferences dialog.
+        :param help_str: Help string to be shown in preferences.
         :param min_val: minimum value
         :param max_val: maximum value
         :param options: options (Array of list objects)
-        :param select2: select2 options (object)
+        :param select: select options (object)
         :param fields: field schema (if preference has more than one field to
                         take input from user e.g. keyboardshortcut preference)
         :param allow_blanks: Flag specify whether to allow blank value.
@@ -90,7 +90,7 @@ class _Preference():
             db.session.add(res)
             db.session.commit()
             res = PrefTable.query.filter_by(
-                name=name
+                name=name, cid=cid
             ).first()
 
         # Save this id for letter use.
@@ -134,7 +134,6 @@ class _Preference():
         except Exception as e:
             current_app.logger.exception(e)
             return self.default
-        return res.value
 
     def _get_format_data(self, res):
         """
@@ -149,10 +148,11 @@ class _Preference():
                 if 'value' in opt and opt['value'] == res.value:
                     return True, res.value
 
-            if self.control_props and self.control_props['creatable']:
+            if self.control_props and 'creatable' in self.control_props and \
+                    self.control_props['creatable']:
                 return True, res.value
 
-            if self.select and self.select['tags']:
+            if self.select and 'tags' in self.select and self.select['tags']:
                 return True, res.value
             return True, self.default
         if self._type == 'select':
@@ -305,7 +305,7 @@ class Preferences():
 
         :param name: Name of the module
         :param label: Display name of the module, it will be displayed in the
-                      preferences dialog.
+                      preferences.
 
         :returns nothing
         """
@@ -506,7 +506,7 @@ class Preferences():
         :param module:   Name of the module
         :param category: Name of category
         :param name:     Name of the option
-        :param label:    Label of the option, shown in the preferences dialog.
+        :param label:    Label of the option, shown in the preferences.
         :param _type:    Type of the option.
                          Allowed type of options are as below:
                          boolean, integer, numeric, date, datetime,

@@ -2,7 +2,7 @@
 #
 # pgAdmin 4 - PostgreSQL Tools
 #
-# Copyright (C) 2013 - 2024, The pgAdmin Development Team
+# Copyright (C) 2013 - 2025, The pgAdmin Development Team
 # This software is released under the PostgreSQL Licence
 #
 #########################################################################
@@ -21,6 +21,7 @@ class SecurityHeaders:
             'X_CONTENT_TYPE_OPTIONS': 'X-Content-Type-Options',
             'X_XSS_PROTECTION': 'X-XSS-Protection',
             'WEB_SERVER': 'Server',
+            'CROSS_ORIGIN_OPENER_POLICY': 'Cross-Origin-Opener-Policy'
         }
 
         # X-Frame-Options for security

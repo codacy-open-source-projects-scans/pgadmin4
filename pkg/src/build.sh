@@ -4,7 +4,7 @@
 #
 # pgAdmin 4 - PostgreSQL Tools
 #
-# Copyright (C) 2013 - 2024, The pgAdmin Development Team
+# Copyright (C) 2013 - 2025, The pgAdmin Development Team
 # This software is released under the PostgreSQL Licence
 #
 #########################################################################
@@ -34,6 +34,12 @@ DOC_TARBALL_NAME=$(echo "${APP_NAME}-${APP_LONG_VERSION}-docs" | sed 's/ //g' | 
 
 # Get the github timestamp
 git log -1 --format='%H %as' > web/commit_hash
+
+pushd web > /dev/null || exit
+  # Set the git:hash to empty as we already set the commit_hash
+  # this helps in building pgAdmin directly from tar ball without needing git.
+  npm pkg set "scripts.git:hash=exit 0"
+popd > /dev/null || exit
 
 # Output basic details to show we're working
 echo "Building tarballs for ${APP_NAME} version ${APP_LONG_VERSION}..."

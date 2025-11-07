@@ -2,7 +2,7 @@
 #
 # pgAdmin 4 - PostgreSQL Tools
 #
-# Copyright (C) 2013 - 2024, The pgAdmin Development Team
+# Copyright (C) 2013 - 2025, The pgAdmin Development Team
 # This software is released under the PostgreSQL Licence
 #
 ##########################################################################
@@ -10,8 +10,8 @@
 import os
 import sys
 
-if sys.version_info < (3, 8):
-    raise Exception('This application must be run under Python 3.8 or later.')
+if sys.version_info < (3, 9):
+    raise Exception('This application must be run under Python 3.9 or later.')
 
 import builtins
 

@@ -2,12 +2,11 @@
 //
 // pgAdmin 4 - PostgreSQL Tools
 //
-// Copyright (C) 2013 - 2024, The pgAdmin Development Team
+// Copyright (C) 2013 - 2025, The pgAdmin Development Team
 // This software is released under the PostgreSQL Licence
 //
 //////////////////////////////////////////////////////////////
 
-import React from 'react';
 import { ToggleButton, ToggleButtonGroup, TableBody, TableCell, TableHead, TableRow } from '@mui/material';
 import CheckRoundedIcon from '@mui/icons-material/CheckRounded';
 import { DefaultButton, PrimaryButton } from '../../../../static/js/components/Buttons';

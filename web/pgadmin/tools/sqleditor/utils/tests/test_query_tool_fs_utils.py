@@ -2,14 +2,14 @@
 #
 # pgAdmin 4 - PostgreSQL Tools
 #
-# Copyright (C) 2013 - 2024, The pgAdmin Development Team
+# Copyright (C) 2013 - 2025, The pgAdmin Development Team
 # This software is released under the PostgreSQL Licence
 #
 ##########################################################################
 import os
+
+from pgadmin.misc.file_manager import read_file_generator
 from pgadmin.utils.route import BaseTestGenerator
-from pgadmin.tools.sqleditor.utils.query_tool_fs_utils import \
-    read_file_generator
 
 
 class TestReadFileGeneratorForEncoding(BaseTestGenerator):

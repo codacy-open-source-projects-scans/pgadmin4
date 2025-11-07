@@ -2,7 +2,7 @@
 //
 // pgAdmin 4 - PostgreSQL Tools
 //
-// Copyright (C) 2013 - 2024, The pgAdmin Development Team
+// Copyright (C) 2013 - 2025, The pgAdmin Development Team
 // This software is released under the PostgreSQL Licence
 //
 //////////////////////////////////////////////////////////////
@@ -78,12 +78,14 @@ define('pgadmin.node.view', [
           category: 'create', priority: 1, label: gettext('View...'),
           data: {action: 'create', check: true},
           enable: 'canCreate',
+          shortcut_preference: ['browser', 'sub_menu_create'],
         },{
           name: 'create_view', node: 'view', module: this,
           applies: ['object', 'context'], callback: 'show_obj_properties',
           category: 'create', priority: 1, label: gettext('View...'),
           data: {action: 'create', check: true},
           enable: 'canCreate',
+          shortcut_preference: ['browser', 'sub_menu_create'],
         },{
           name: 'create_view', node: 'schema', module: this,
           applies: ['object', 'context'], callback: 'show_obj_properties',
