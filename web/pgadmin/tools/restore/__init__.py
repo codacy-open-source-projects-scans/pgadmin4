@@ -10,6 +10,7 @@
 """Implements Restore Utility"""
 
 import json
+import re
 
 from flask import render_template, request, current_app, Response
 from flask_babel import gettext as _
@@ -335,7 +336,7 @@ def get_restore_util_args(data, manager, server, driver, conn, filepath):
                      False)
         set_multiple('indexes', '--index', data, args, driver, conn, False)
 
-    args.append(fs_short_path(filepath))
+    args.append(filepath)
 
     return args
 
@@ -374,7 +375,43 @@ def use_restore_utility(data, manager, server, driver, conn, filepath):
     return None, utility, args
 
 
+def has_meta_commands(path, chunk_size=8 * 1024 * 1024):
+    """
+    Quickly detect lines starting with '\' in large SQL files.
+    Works even when lines cross chunk boundaries.
+    """
+    # Look for start-of-line pattern: beginning or after newline,
+    # optional spaces, then backslash
+    pattern = re.compile(br'(^|\n)[ \t]*\\')
+
+    try:
+        with open(path, "rb") as f:
+            prev_tail = b""
+            while chunk := f.read(chunk_size):
+                data = prev_tail + chunk
+
+                # Search for pattern
+                if pattern.search(data):
+                    return True
+
+                # Keep a small tail to preserve line boundary context
+                prev_tail = data[-10:]  # keep last few bytes
+    except FileNotFoundError:
+        current_app.logger.error("File not found.")
+    except PermissionError:
+        current_app.logger.error("Insufficient permissions to access.")
+
+    return False
+
+
 def use_sql_utility(data, manager, server, filepath):
+    # Check the meta commands in file.
+    if has_meta_commands(filepath):
+        return _("Restore blocked: the selected PLAIN SQL file contains psql "
+                 "meta-commands (for example \\! or \\i). For safety, "
+                 "pgAdmin does not execute meta-commands from PLAIN restores. "
+                 "Please remove meta-commands."), None, None
+
     utility = manager.utility('sql')
     ret_val = does_utility_exist(utility)
     if ret_val:
