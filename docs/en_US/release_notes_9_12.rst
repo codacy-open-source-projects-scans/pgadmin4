@@ -27,6 +27,7 @@ New features
 ************
 
   | `Issue #8890 <https://github.com/pgadmin-org/pgadmin4/issues/8890>`_ - Add a new button in the query tool data output toolbar to get entire range of data.
+  | `Issue #9292 <https://github.com/pgadmin-org/pgadmin4/issues/9292>`_ - Enhance OAUTH2 and OIDC authentication support with improved claims handling and configuration options.
 
 Housekeeping
 ************
@@ -35,7 +36,9 @@ Housekeeping
 Bug fixes
 *********
 
+  | `Issue #8916 <https://github.com/pgadmin-org/pgadmin4/issues/8916>`_ - Warn user of unsaved data output edits before page navigation.
   | `Issue #8987 <https://github.com/pgadmin-org/pgadmin4/issues/8987>`_ - Fix Query Tool state restoration for new connections and queries.
+  | `Issue #9074 <https://github.com/pgadmin-org/pgadmin4/issues/9074>`_ - Fix pg_restore logs to distinguish UI sync issues from actual failures.
   | `Issue #9110 <https://github.com/pgadmin-org/pgadmin4/issues/9110>`_ - Optimize checkbox selection logic in backup dialog objects tree.
   | `Issue #9196 <https://github.com/pgadmin-org/pgadmin4/issues/9196>`_ - Fixed an issue where double click to open a file in the file manager is not working.
   | `Issue #9223 <https://github.com/pgadmin-org/pgadmin4/issues/9223>`_ - Upgrade ID column in the database table to BigInteger to support large OID values.
