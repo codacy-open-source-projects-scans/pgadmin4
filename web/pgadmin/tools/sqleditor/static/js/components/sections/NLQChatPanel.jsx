@@ -26,6 +26,7 @@ import { format as formatSQL } from 'sql-formatter';
 import gettext from 'sources/gettext';
 import url_for from 'sources/url_for';
 import getApiInstance from '../../../../../../static/js/api_instance';
+import { getRandomThinkingMessage } from '../../../../../../static/js/ai_thinking_messages';
 import usePreferences from '../../../../../../preferences/static/js/store';
 import {
   QueryToolContext,
@@ -65,6 +66,7 @@ const MessagesArea = styled('div')(({ theme }) => ({
   display: 'flex',
   flexDirection: 'column',
   gap: theme.spacing(1),
+  userSelect: 'text',
 }));
 
 const MessageBubble = styled(Paper)(({ theme, isuser }) => ({
@@ -138,30 +140,6 @@ const MESSAGE_TYPES = {
   THINKING: 'thinking',
   ERROR: 'error',
 };
-
-// Elephant/PostgreSQL-themed processing messages
-const THINKING_MESSAGES = [
-  'Consulting the elephant...',
-  'Traversing the B-tree...',
-  'Vacuuming the catalog...',
-  'Analyzing table statistics...',
-  'Joining the herds...',
-  'Indexing the savanna...',
-  'Querying the watering hole...',
-  'Optimizing the plan...',
-  'Warming up the cache...',
-  'Gathering the tuples...',
-  'Scanning the relations...',
-  'Checking constraints...',
-  'Rolling back the peanuts...',
-  'Committing to memory...',
-  'Trumpeting the results...',
-];
-
-// Helper function to get a random thinking message
-function getRandomThinkingMessage() {
-  return THINKING_MESSAGES[Math.floor(Math.random() * THINKING_MESSAGES.length)];
-}
 
 // Single chat message component
 function ChatMessage({ message, onInsertSQL, onReplaceSQL, textColors, cmKey }) {
@@ -272,6 +250,7 @@ export function NLQChatPanel() {
   const [inputValue, setInputValue] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [conversationId, setConversationId] = useState(null);
+  const [conversationHistory, setConversationHistory] = useState([]);
   const [thinkingMessageId, setThinkingMessageId] = useState(null);
   const [llmInfo, setLlmInfo] = useState({ provider: null, model: null });
 
@@ -288,9 +267,11 @@ export function NLQChatPanel() {
   });
 
   const messagesEndRef = useRef(null);
+  const inputRef = useRef(null);
   const abortControllerRef = useRef(null);
   const readerRef = useRef(null);
   const stoppedRef = useRef(false);
+  const clearedRef = useRef(false);
   const eventBus = useContext(QueryToolEventsContext);
   const queryToolCtx = useContext(QueryToolContext);
   const editorPrefs = usePreferences().getPreferencesForModule('editor');
@@ -366,6 +347,16 @@ export function NLQChatPanel() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
+  // Auto-focus the input when loading completes
+  useEffect(() => {
+    if (!isLoading) {
+      // Defer focus to ensure the DOM has updated (disabled=false)
+      setTimeout(() => {
+        inputRef.current?.focus();
+      }, 0);
+    }
+  }, [isLoading]);
+
   // Force CodeMirror re-render when panel becomes visible (fixes tab switching issue)
   const [cmKey, setCmKey] = useState(0);
   useEffect(() => {
@@ -405,8 +396,21 @@ export function NLQChatPanel() {
   };
 
   const handleClearConversation = () => {
+    // Mark as cleared so in-flight stream handlers ignore late events
+    clearedRef.current = true;
+    // Cancel any active stream
+    if (readerRef.current) {
+      readerRef.current.cancel();
+      readerRef.current = null;
+    }
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+    }
     setMessages([]);
     setConversationId(null);
+    setConversationHistory([]);
+    setIsLoading(false);
   };
 
   // Stop the current request
@@ -444,8 +448,9 @@ export function NLQChatPanel() {
   const handleSubmit = async () => {
     if (!inputValue.trim() || isLoading) return;
 
-    // Reset stopped flag
+    // Reset stopped and cleared flags
     stoppedRef.current = false;
+    clearedRef.current = false;
 
     // Fetch latest LLM provider/model info before submitting
     fetchLlmInfo();
@@ -505,6 +510,7 @@ export function NLQChatPanel() {
           body: JSON.stringify({
             message: userMessage,
             conversation_id: conversationId,
+            history: conversationHistory,
           }),
           signal: controller.signal,
         }
@@ -545,8 +551,8 @@ export function NLQChatPanel() {
 
       readerRef.current = null;
 
-      // Check if user manually stopped
-      if (stoppedRef.current) {
+      // Check if user manually stopped (but not cleared)
+      if (stoppedRef.current && !clearedRef.current) {
         setMessages((prev) => [
           ...prev.filter((m) => m.id !== thinkingId),
           {
@@ -559,8 +565,10 @@ export function NLQChatPanel() {
       clearTimeout(timeoutId);
       abortControllerRef.current = null;
       readerRef.current = null;
-      // Show appropriate message based on error type
-      if (error.name === 'AbortError') {
+      // If conversation was cleared, ignore all late errors
+      if (clearedRef.current) {
+        // Do nothing - conversation was wiped
+      } else if (error.name === 'AbortError') {
         // Check if this was a user-initiated stop or a timeout
         if (stoppedRef.current) {
           // User manually stopped
@@ -629,6 +637,9 @@ export function NLQChatPanel() {
       }
       if (event.conversation_id) {
         setConversationId(event.conversation_id);
+      }
+      if (event.history) {
+        setConversationHistory(event.history);
       }
       break;
 
@@ -719,8 +730,9 @@ export function NLQChatPanel() {
           >
             <Typography variant="body2" style={{ color: textColors.secondary }}>
               {gettext(
-                'Describe what SQL you need and I\'ll generate it for you. ' +
-                  'I can help with SELECT, INSERT, UPDATE, DELETE, and DDL statements.'
+                'Ask a question about your database or describe the SQL you need ' +
+                'and I\'ll generate it for you. ' +
+                'I can help with SELECT, INSERT, UPDATE, DELETE, and DDL statements.'
               )}
             </Typography>
           </Box>
@@ -741,11 +753,12 @@ export function NLQChatPanel() {
 
       <InputArea>
         <TextField
+          inputRef={inputRef}
           fullWidth
           multiline
           minRows={1}
           maxRows={4}
-          placeholder={gettext('Describe the SQL you need...')}
+          placeholder={gettext('Ask a question or describe the SQL you need...')}
           value={inputValue}
           onChange={(e) => setInputValue(e.target.value)}
           onKeyDown={handleKeyDown}
