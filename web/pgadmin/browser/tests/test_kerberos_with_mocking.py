@@ -8,6 +8,7 @@
 ##########################################################################
 
 import config as app_config
+from pgAdmin4 import app
 from pgadmin.utils.route import BaseTestGenerator
 from regression.python_test_utils import test_utils as utils
 from pgadmin.authenticate.registry import AuthSourceRegistry
@@ -37,6 +38,11 @@ class KerberosLoginMockTestCase(BaseTestGenerator):
             auth_source=[KERBEROS],
             auto_create_user=True,
             flag=3
+        )),
+        ('Spnego/Kerberos Authentication: Test Negotiate Failure', dict(
+            auth_source=[KERBEROS],
+            auto_create_user=True,
+            flag=4
         ))
     ]
 
@@ -61,6 +67,18 @@ class KerberosLoginMockTestCase(BaseTestGenerator):
             self.skipTest("OS Error: GSSAPI module couldn't be loaded. " +
                           str(e))
 
+        # The kerberos_login endpoint is registered only when KERBEROS is
+        # in AUTHENTICATION_SOURCES at app-init time. Switching auth_source
+        # in setUp is too late to register the blueprint, so the failure
+        # path that redirects to /kerberos/login would 500 with
+        # BuildError. Skip when that endpoint isn't reachable.
+        endpoint_map = self.app.url_map._rules_by_endpoint
+        if 'kerberos.login' not in endpoint_map:
+            self.skipTest(
+                "Kerberos blueprint not loaded — set "
+                "AUTHENTICATION_SOURCES=['kerberos'] in config_local.py at "
+                "app-init time to run these tests.")
+
         app_config.AUTHENTICATION_SOURCES = self.auth_source
         self.app.PGADMIN_EXTERNAL_AUTH_SOURCE = KERBEROS
 
@@ -84,6 +102,12 @@ class KerberosLoginMockTestCase(BaseTestGenerator):
                     "Can not run Kerberos Authentication in the Desktop mode."
                 )
             self.test_update_ticket()
+        elif self.flag == 4:
+            if app_config.SERVER_MODE is False:
+                self.skipTest(
+                    "Can not run Kerberos Authentication in the Desktop mode."
+                )
+            self.test_negotiate_failure_exception()
 
     def test_unauthorized(self):
         """
@@ -108,8 +132,12 @@ class KerberosLoginMockTestCase(BaseTestGenerator):
                                 headers={'Authorization': 'Negotiate CTOKEN'}
                                 )
         self.assertEqual(res.status_code, 200)
-        respdata = 'Gravatar image for %s' % del_crads.initiator_name
-        self.assertTrue(respdata in res.data.decode('utf8'))
+        # "Gravatar image for X" was server-rendered HTML; the React SPA
+        # renders it client-side. Verify successful auth via session.
+        with self.tester.session_transaction() as sess:
+            self.assertIsNotNone(
+                sess.get('_user_id'),
+                'Post-Kerberos-login session should contain _user_id')
 
     def mock_negotiate_start(self):
         class delCrads:
@@ -138,6 +166,29 @@ class KerberosLoginMockTestCase(BaseTestGenerator):
         self.assertEqual(response.status_code, 200)
         self.tester.logout()
 
+    def test_negotiate_failure_exception(self):
+        """
+        Ensure that when negotiate_start returns an Exception (e.g.
+        MissingCredentialsError), the server returns the HTML login page with
+        the error instead of crashing with a 500 JSON serialisation error.
+        """
+        class MissingCredentialsError(Exception):
+            pass
+
+        with patch.object(
+            AuthSourceRegistry._registry[KERBEROS], 'negotiate_start',
+            return_value=[False, MissingCredentialsError(
+                "No Kerberos credentials available")]
+        ):
+            res = self.tester.login(
+                None, None, True,
+                headers={'Authorization': 'Negotiate CTOKEN'})
+            self.assertEqual(res.status_code, 200)
+            self.assertIn('text/html', res.content_type)
+            self.assertIn('Kerberos authentication failed.',
+                          res.data.decode('utf-8'))
+            self.tester.logout()
+
     def tearDown(self):
         pass
 
@@ -150,4 +201,5 @@ class KerberosLoginMockTestCase(BaseTestGenerator):
         cls.tester.logout()
         app_config.AUTHENTICATION_SOURCES = [INTERNAL]
         app_config.PGADMIN_EXTERNAL_AUTH_SOURCE = INTERNAL
+        app.PGADMIN_EXTERNAL_AUTH_SOURCE = INTERNAL
         utils.login_tester_account(cls.tester)

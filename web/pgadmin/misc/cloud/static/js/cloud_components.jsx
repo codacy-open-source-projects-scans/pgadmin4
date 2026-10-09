@@ -13,10 +13,8 @@ import { DefaultButton, PrimaryButton } from '../../../../static/js/components/B
 import PropTypes from 'prop-types';
 import { getAWSSummary } from './aws';
 import  {getAzureSummary} from './azure';
-import { getBigAnimalSummary } from './biganimal';
 import gettext from 'sources/gettext';
 import { getGoogleSummary } from './google';
-import { CLOUD_PROVIDERS_LABELS } from './cloud_constants';
 import Table from '../../../../static/js/components/Table';
 
 
@@ -36,7 +34,7 @@ export function ToggleButtons(props) {
       exclusive>
       {
         (props.options||[]).map((option)=>{
-          return (<ToggleButton value={option.value} key={option.label} aria-label={option.label} sx={{marginTop: '0px !important',padding: '12px'}} className={( option.label==gettext(CLOUD_PROVIDERS_LABELS.GOOGLE) ? 'paddingLeft: 1.5rem' : null )} component={props.cloudProvider == option.value ? PrimaryButton : DefaultButton}>
+          return (<ToggleButton value={option.value} key={option.label} aria-label={option.label} sx={{marginTop: '0px !important', padding: '12px', justifyContent: 'flex-start'}} component={props.cloudProvider == option.value ? PrimaryButton : DefaultButton}>
             <CheckRoundedIcon style={{visibility: props.cloudProvider == option.value  ? 'visible': 'hidden'}}/>&nbsp;
             {option.icon}&nbsp;&nbsp;&nbsp;&nbsp;{option.label}
           </ToggleButton>);
@@ -56,10 +54,7 @@ export function FinalSummary(props) {
   let summary = [],
     summaryHeader = ['Cloud Details', 'Version and Instance Details', 'Storage Details', 'Database Details'];
 
-  if (props.cloudProvider == 'biganimal') {
-    summary = getBigAnimalSummary(props.cloudProvider, props.clusterTypeData, props.instanceData, props.databaseData);
-    summaryHeader = ['Cloud Details',  'Cluster Details' ,'Version Details', 'Storage Details', 'Database Details'];
-  } else if(props.cloudProvider == 'azure') {
+  if(props.cloudProvider == 'azure') {
     summaryHeader.push('Network Connectivity','Availability');
     summary = getAzureSummary(props.cloudProvider, props.instanceData, props.databaseData);
   }else if(props.cloudProvider == 'google') {
@@ -98,5 +93,4 @@ FinalSummary.propTypes = {
   cloudProvider: PropTypes.string,
   instanceData: PropTypes.object,
   databaseData: PropTypes.object,
-  clusterTypeData: PropTypes.object,
 };

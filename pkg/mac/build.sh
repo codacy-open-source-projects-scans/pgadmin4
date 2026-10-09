@@ -52,10 +52,24 @@ if [ "${PGADMIN_POSTGRES_DIR}" == "" ]; then
     export PGADMIN_POSTGRES_DIR=/usr/local/pgsql
 fi
 
-if [ "${PGADMIN_PYTHON_VERSION}" == "" ]; then
-    echo "PGADMIN_PYTHON_VERSION not set. Setting it to the default: 3.13.11"
-    export PGADMIN_PYTHON_VERSION=3.13.11
+# Which Python gets bundled is a property of this commit rather than of the
+# machine or the environment the build happens to run in, so it is read from
+# pkg/python-version.txt and cannot be overridden from outside. The Windows
+# build reads the same file.
+#
+# Unlike Windows, this still builds the framework with relocatable-python,
+# which downloads from python.org itself and so only needs the version.
+# python-build-standalone's relocatable distributions are not framework-shaped,
+# and shipping one instead would mean reworking both the codesigning and the
+# @loader_path rewriting in _fixup_imports, which is a job of its own.
+PYTHON_VERSION_FILE="${SOURCE_DIR}/pkg/python-version.txt"
+PGADMIN_PYTHON_VERSION=$(sed -nE 's/^PYTHON_VERSION=([0-9.]+)[[:space:]]*$/\1/p' "${PYTHON_VERSION_FILE}")
+if [ -z "${PGADMIN_PYTHON_VERSION}" ]; then
+    echo "ERROR: could not read PYTHON_VERSION from ${PYTHON_VERSION_FILE}" >&2
+    exit 1
 fi
+export PGADMIN_PYTHON_VERSION
+echo "Bundling Python ${PGADMIN_PYTHON_VERSION}, per ${PYTHON_VERSION_FILE}."
 
 # Initialize variables
 CREATE_ZIP=0
@@ -92,6 +106,9 @@ _build_runtime
 _create_python_env
 _build_docs
 _complete_bundle
+_strip_architecture
+_prune_dangling_symlinks
+_verify_bundle_linkage
 _generate_sbom
 _codesign_binaries
 _codesign_bundle

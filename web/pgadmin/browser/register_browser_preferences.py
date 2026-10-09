@@ -101,6 +101,18 @@ def register_browser_preferences(self):
         )
     )
 
+    self.preference.register(
+        'display', 'show_server_color_indicator',
+        gettext("Show server color indicator in panel tabs?"), 'boolean',
+        False,
+        category_label=PREF_LABEL_DISPLAY,
+        help_str=gettext(
+            'If enabled, a colored circle indicator will be shown in panel '
+            'tabs (Query Tool, ERD Tool, etc.) matching the server\'s custom '
+            'background color.'
+        )
+    )
+
     self.table_row_count_threshold = self.preference.register(
         'properties', 'table_row_count_threshold',
         gettext("Count rows if estimated less than"), 'integer', 2000,
@@ -115,6 +127,17 @@ def register_browser_preferences(self):
         help_str=gettext(
             'The maximum number of history rows to show on '
             'the Statistics tab for pgAgent jobs.'
+        )
+    )
+
+    self.pgtimetable_row_threshold = self.preference.register(
+        'properties', 'pgtimetable_row_threshold',
+        gettext("Maximum pgTimeTable history rows"), 'integer', 250,
+        category_label=gettext('Properties'),
+        min_val=1, max_val=9999,
+        help_str=gettext(
+            'The maximum number of history rows to show on '
+            'the Statistics tab for pgTimeTable chains and tasks.'
         )
     )
 
@@ -145,6 +168,21 @@ def register_browser_preferences(self):
             'alt': True,
             'shift': True,
             'control': False,
+            'key': {'key_code': 66, 'char': 'b'}
+        },
+        category_label=PREF_LABEL_KEYBOARD_SHORTCUTS,
+        fields=fields
+    )
+
+    self.preference.register(
+        'keyboard_shortcuts',
+        'toggle_object_explorer',
+        gettext('Toggle Object Explorer'),
+        'keyboardshortcut',
+        {
+            'alt': True,
+            'shift': False,
+            'control': True,
             'key': {'key_code': 66, 'char': 'b'}
         },
         category_label=PREF_LABEL_KEYBOARD_SHORTCUTS,

@@ -93,8 +93,14 @@ def adhoc_connect_server():
                 ).format(arg)
             )
 
-    connection_params = convert_connection_parameter(
-        data.get('connection_params', []))
+    # convert_connection_parameter() is bidirectional. For a save path we
+    # want the storage shape (dict). If the input is already a dict, keep
+    # it; otherwise assume frontend list shape and convert.
+    raw_params = data.get('connection_params', [])
+    if isinstance(raw_params, dict):
+        connection_params = raw_params
+    else:
+        connection_params = convert_connection_parameter(raw_params)
 
     if connection_params is not None:
         if 'hostaddr' in connection_params and \
@@ -169,6 +175,23 @@ def adhoc_connect_server():
 
                 # Clone the server object
                 server = server.clone()
+
+                # Server.clone() copies every column from the source row,
+                # including user_id/shared/shared_username. When the source
+                # is another user's shared server, the clone must not inherit
+                # that ownership: force the new adhoc record to belong to the
+                # current user and to be private, otherwise a non-owner ends
+                # up persisting a cross-tenant, administrator-owned server
+                # row.
+                server.user_id = current_user.id
+                server.shared = False
+                server.shared_username = None
+                # The clone also inherits the source server's stored
+                # credentials; drop them so a non-owner can't persist
+                # another user's secret material under their own row.
+                server.password = None
+                server.save_password = False
+                server.tunnel_password = None
 
                 # Replace the following with the new/changed value.
                 server.maintenance_db = new_db

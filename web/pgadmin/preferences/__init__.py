@@ -185,6 +185,7 @@ def preferences_s():
 
 
 @blueprint.route("/get_all_cli", methods=["GET"], endpoint='get_all_cli')
+@pga_login_required
 def get_all_cli():
     """Fetch all preferences for caching."""
     # Load Preferences
@@ -313,13 +314,9 @@ def save_pref(data):
     if data['value'] in ['true','false']:
         data['value'] = True if data['value'] == 'true' else False
 
-    res, _ = Preferences.save_cli(
+    return Preferences.save_cli(
         data['mid'], data['category_id'], data['id'], data['user_id'],
         data['value'])
-
-    if not res:
-        return False
-    return True
 
 
 @blueprint.route("/update", methods=["PUT"], endpoint="update_pref")

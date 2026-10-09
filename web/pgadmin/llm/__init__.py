@@ -10,9 +10,11 @@
 """A blueprint module implementing LLM/AI configuration."""
 
 import json
+import logging
 import ssl
 from flask import request
 from flask_babel import gettext
+from flask_security import permissions_required
 from pgadmin.utils import PgAdminModule
 from pgadmin.utils.preferences import Preferences
 from pgadmin.utils.ajax import make_json_response, internal_server_error
@@ -20,6 +22,9 @@ from pgadmin.user_login_check import pga_login_required
 from pgadmin.utils.constants import MIMETYPE_APP_JS
 from pgadmin.utils.csrf import pgCSRFProtect
 import config
+from pgadmin.llm.utils import LLMApiError, urlopen_no_redirect
+from pgadmin.tools.user_management.PgAdminPermissions import \
+    AllPermissionTypes
 
 # Try to use certifi for proper SSL certificate handling
 try:
@@ -48,6 +53,16 @@ class LLMModule(PgAdminModule):
         # Don't register AI preferences if LLM is disabled at system level
         if not getattr(config, 'LLM_ENABLED', False):
             return
+
+        # Warn once if the SSRF allowlist has been disabled. Empty list
+        # means validate_api_url() returns True for any URL, so admins
+        # who set this by accident lose SSRF protection silently.
+        if not getattr(config, 'ALLOWED_LLM_API_URLS', None):
+            logging.getLogger(__name__).warning(
+                'ALLOWED_LLM_API_URLS is empty; SSRF protection on LLM '
+                'API URL fields is disabled. Populate the allowlist in '
+                'config.py to re-enable.'
+            )
 
         self.preference = Preferences('ai', gettext('AI'))
 
@@ -411,9 +426,16 @@ def get_anthropic_models():
     try:
         models = _fetch_anthropic_models(api_key, api_url)
         return make_json_response(data={'models': models}, status=200)
-    except Exception as e:
+    except LLMApiError as e:
         return make_json_response(
             data={'models': [], 'error': str(e)},
+            status=200
+        )
+    except Exception:
+        return make_json_response(
+            data={'models': [],
+                  'error': 'Failed to fetch Anthropic models. '
+                           'Check the API key and URL configuration.'},
             status=200
         )
 
@@ -430,15 +452,41 @@ def refresh_anthropic_models():
     and/or custom API URL.
     Used by the preferences refresh button to load models before saving.
     """
-    from pgadmin.llm.utils import read_api_key_file
+    from pgadmin.llm.utils import (
+        read_api_key_file, validate_api_key_path, validate_api_url
+    )
 
     data = request.get_json(force=True, silent=True) or {}
     api_key_file = data.get('api_key_file', '')
     api_url = data.get('api_url', '')
 
+    if api_url and not validate_api_url(api_url):
+        return make_json_response(
+            data={'models': [],
+                  'error': 'API URL is not in the allowed list. '
+                           'Contact your administrator to update '
+                           'ALLOWED_LLM_API_URLS in the server '
+                           'configuration.'},
+            status=200
+        )
+
     api_key = None
     if api_key_file:
-        api_key = read_api_key_file(api_key_file)
+        # Capture the resolved canonical path and pass it forward so
+        # the file we open is the one we just validated (avoids a
+        # symlink-swap TOCTOU between validation and read).
+        safe_path = validate_api_key_path(api_key_file)
+        if safe_path is None:
+            return make_json_response(
+                data={'models': [],
+                      'error': 'API key file path is not permitted. '
+                               'The file must be within your private '
+                               'user storage directory; shared storage '
+                               'and other locations are not allowed for '
+                               'security reasons.'},
+                status=200
+            )
+        api_key = read_api_key_file(safe_path)
 
     if not api_key and not api_url:
         return make_json_response(
@@ -450,9 +498,16 @@ def refresh_anthropic_models():
     try:
         models = _fetch_anthropic_models(api_key, api_url)
         return make_json_response(data={'models': models}, status=200)
-    except Exception as e:
+    except LLMApiError as e:
         return make_json_response(
             data={'models': [], 'error': str(e)},
+            status=200
+        )
+    except Exception:
+        return make_json_response(
+            data={'models': [],
+                  'error': 'Failed to fetch Anthropic models. '
+                           'Check the API key file and URL.'},
             status=200
         )
 
@@ -477,9 +532,16 @@ def get_openai_models():
     try:
         models = _fetch_openai_models(api_key, api_url)
         return make_json_response(data={'models': models}, status=200)
-    except Exception as e:
+    except LLMApiError as e:
         return make_json_response(
             data={'models': [], 'error': str(e)},
+            status=200
+        )
+    except Exception:
+        return make_json_response(
+            data={'models': [],
+                  'error': 'Failed to fetch OpenAI models. '
+                           'Check the API key and URL configuration.'},
             status=200
         )
 
@@ -496,15 +558,41 @@ def refresh_openai_models():
     and/or custom API URL.
     Used by the preferences refresh button to load models before saving.
     """
-    from pgadmin.llm.utils import read_api_key_file
+    from pgadmin.llm.utils import (
+        read_api_key_file, validate_api_key_path, validate_api_url
+    )
 
     data = request.get_json(force=True, silent=True) or {}
     api_key_file = data.get('api_key_file', '')
     api_url = data.get('api_url', '')
 
+    if api_url and not validate_api_url(api_url):
+        return make_json_response(
+            data={'models': [],
+                  'error': 'API URL is not in the allowed list. '
+                           'Contact your administrator to update '
+                           'ALLOWED_LLM_API_URLS in the server '
+                           'configuration.'},
+            status=200
+        )
+
     api_key = None
     if api_key_file:
-        api_key = read_api_key_file(api_key_file)
+        # Capture the resolved canonical path and pass it forward so
+        # the file we open is the one we just validated (avoids a
+        # symlink-swap TOCTOU between validation and read).
+        safe_path = validate_api_key_path(api_key_file)
+        if safe_path is None:
+            return make_json_response(
+                data={'models': [],
+                      'error': 'API key file path is not permitted. '
+                               'The file must be within your private '
+                               'user storage directory; shared storage '
+                               'and other locations are not allowed for '
+                               'security reasons.'},
+                status=200
+            )
+        api_key = read_api_key_file(safe_path)
 
     if not api_key and not api_url:
         return make_json_response(
@@ -515,9 +603,16 @@ def refresh_openai_models():
     try:
         models = _fetch_openai_models(api_key, api_url)
         return make_json_response(data={'models': models}, status=200)
-    except Exception as e:
+    except LLMApiError as e:
         return make_json_response(
             data={'models': [], 'error': str(e)},
+            status=200
+        )
+    except Exception:
+        return make_json_response(
+            data={'models': [],
+                  'error': 'Failed to fetch OpenAI models. '
+                           'Check the API key file and URL.'},
             status=200
         )
 
@@ -540,9 +635,16 @@ def get_ollama_models():
     try:
         models = _fetch_ollama_models(api_url)
         return make_json_response(data={'models': models}, status=200)
-    except Exception as e:
+    except LLMApiError as e:
         return make_json_response(
             data={'models': [], 'error': str(e)},
+            status=200
+        )
+    except Exception:
+        return make_json_response(
+            data={'models': [],
+                  'error': 'Failed to fetch Ollama models. '
+                           'Check the API URL configuration.'},
             status=200
         )
 
@@ -558,6 +660,8 @@ def refresh_ollama_models():
     Fetch available Ollama models using a provided API URL.
     Used by the preferences refresh button to load models before saving.
     """
+    from pgadmin.llm.utils import validate_api_url
+
     data = request.get_json(force=True, silent=True) or {}
     api_url = data.get('api_url', '')
 
@@ -567,12 +671,29 @@ def refresh_ollama_models():
             status=200
         )
 
+    if not validate_api_url(api_url):
+        return make_json_response(
+            data={'models': [],
+                  'error': 'API URL is not in the allowed list. '
+                           'Contact your administrator to update '
+                           'ALLOWED_LLM_API_URLS in the server '
+                           'configuration.'},
+            status=200
+        )
+
     try:
         models = _fetch_ollama_models(api_url)
         return make_json_response(data={'models': models}, status=200)
-    except Exception as e:
+    except LLMApiError as e:
         return make_json_response(
             data={'models': [], 'error': str(e)},
+            status=200
+        )
+    except Exception:
+        return make_json_response(
+            data={'models': [],
+                  'error': 'Failed to fetch Ollama models. '
+                           'Check the API URL configuration.'},
             status=200
         )
 
@@ -595,9 +716,16 @@ def get_docker_models():
     try:
         models = _fetch_docker_models(api_url)
         return make_json_response(data={'models': models}, status=200)
-    except Exception as e:
+    except LLMApiError as e:
         return make_json_response(
             data={'models': [], 'error': str(e)},
+            status=200
+        )
+    except Exception:
+        return make_json_response(
+            data={'models': [],
+                  'error': 'Failed to fetch Docker models. '
+                           'Check the API URL configuration.'},
             status=200
         )
 
@@ -613,6 +741,8 @@ def refresh_docker_models():
     Fetch available Docker models using a provided API URL.
     Used by the preferences refresh button to load models before saving.
     """
+    from pgadmin.llm.utils import validate_api_url
+
     data = request.get_json(force=True, silent=True) or {}
     api_url = data.get('api_url', '')
 
@@ -622,12 +752,29 @@ def refresh_docker_models():
             status=200
         )
 
+    if not validate_api_url(api_url):
+        return make_json_response(
+            data={'models': [],
+                  'error': 'API URL is not in the allowed list. '
+                           'Contact your administrator to update '
+                           'ALLOWED_LLM_API_URLS in the server '
+                           'configuration.'},
+            status=200
+        )
+
     try:
         models = _fetch_docker_models(api_url)
         return make_json_response(data={'models': models}, status=200)
-    except Exception as e:
+    except LLMApiError as e:
         return make_json_response(
             data={'models': [], 'error': str(e)},
+            status=200
+        )
+    except Exception:
+        return make_json_response(
+            data={'models': [],
+                  'error': 'Failed to fetch Docker models. '
+                           'Check the API URL configuration.'},
             status=200
         )
 
@@ -639,8 +786,16 @@ def _fetch_anthropic_models(api_key, api_url=''):
     """
     import urllib.request
     import urllib.error
+    from pgadmin.llm.utils import validate_api_url
 
     base_url = (api_url or 'https://api.anthropic.com/v1').rstrip('/')
+
+    if not validate_api_url(base_url):
+        raise LLMApiError(
+            'API URL is not in the allowed list. '
+            'Check the ALLOWED_LLM_API_URLS configuration.'
+        )
+
     url = f'{base_url}/models'
 
     headers = {
@@ -652,16 +807,16 @@ def _fetch_anthropic_models(api_key, api_url=''):
     req = urllib.request.Request(url, headers=headers)
 
     try:
-        with urllib.request.urlopen(
+        with urlopen_no_redirect(
             req, timeout=30, context=SSL_CONTEXT
         ) as response:
             data = json.loads(response.read().decode('utf-8'))
     except urllib.error.HTTPError as e:
         if e.code == 401:
-            raise ValueError('Invalid API key')
-        raise ConnectionError(f'API error: {e.code}')
+            raise LLMApiError('Invalid API key')
+        raise LLMApiError(f'API error: {e.code}')
     except urllib.error.URLError as e:
-        raise ConnectionError(
+        raise LLMApiError(
             f'Cannot connect to Anthropic API: {e.reason}'
         )
 
@@ -689,7 +844,7 @@ def _fetch_anthropic_models(api_key, api_url=''):
         })
 
     if not models and api_url:
-        raise ConnectionError(
+        raise LLMApiError(
             'No models returned. Check that the API URL is correct.'
         )
 
@@ -706,8 +861,16 @@ def _fetch_openai_models(api_key, api_url=''):
     """
     import urllib.request
     import urllib.error
+    from pgadmin.llm.utils import validate_api_url
 
     base_url = (api_url or 'https://api.openai.com/v1').rstrip('/')
+
+    if not validate_api_url(base_url):
+        raise LLMApiError(
+            'API URL is not in the allowed list. '
+            'Check the ALLOWED_LLM_API_URLS configuration.'
+        )
+
     url = f'{base_url}/models'
 
     headers = {
@@ -719,16 +882,16 @@ def _fetch_openai_models(api_key, api_url=''):
     req = urllib.request.Request(url, headers=headers)
 
     try:
-        with urllib.request.urlopen(
+        with urlopen_no_redirect(
             req, timeout=30, context=SSL_CONTEXT
         ) as response:
             data = json.loads(response.read().decode('utf-8'))
     except urllib.error.HTTPError as e:
         if e.code == 401:
-            raise ValueError('Invalid API key')
-        raise ConnectionError(f'API error: {e.code}')
+            raise LLMApiError('Invalid API key')
+        raise LLMApiError(f'API error: {e.code}')
     except urllib.error.URLError as e:
-        raise ConnectionError(
+        raise LLMApiError(
             f'Cannot connect to OpenAI API: {e.reason}'
         )
 
@@ -749,7 +912,7 @@ def _fetch_openai_models(api_key, api_url=''):
         })
 
     if not models and api_url:
-        raise ConnectionError(
+        raise LLMApiError(
             'No models returned. Check that the API URL is correct '
             'and includes the /v1 path prefix if required by your '
             'provider (e.g., http://localhost:1234/v1).'
@@ -768,25 +931,33 @@ def _fetch_ollama_models(api_url):
     """
     import urllib.request
     import urllib.error
+    from pgadmin.llm.utils import validate_api_url
 
     # Normalize URL
     api_url = api_url.rstrip('/')
+
+    if not validate_api_url(api_url):
+        raise LLMApiError(
+            'API URL is not in the allowed list. '
+            'Check the ALLOWED_LLM_API_URLS configuration.'
+        )
+
     url = f'{api_url}/api/tags'
 
     req = urllib.request.Request(url)
 
     try:
-        with urllib.request.urlopen(
+        with urlopen_no_redirect(
             req, timeout=30, context=SSL_CONTEXT
         ) as response:
             data = json.loads(response.read().decode('utf-8'))
     except urllib.error.URLError as e:
-        raise ConnectionError(
+        raise LLMApiError(
             f'Cannot connect to Ollama: {e.reason}'
         )
-    except OSError as e:
-        raise ConnectionError(
-            f'Error fetching models: {str(e)}'
+    except OSError:
+        raise LLMApiError(
+            'Cannot connect to Ollama'
         )
 
     models = []
@@ -821,27 +992,35 @@ def _fetch_docker_models(api_url):
     """
     import urllib.request
     import urllib.error
+    from pgadmin.llm.utils import validate_api_url
 
     # Normalize URL
     api_url = api_url.rstrip('/')
+
+    if not validate_api_url(api_url):
+        raise LLMApiError(
+            'API URL is not in the allowed list. '
+            'Check the ALLOWED_LLM_API_URLS configuration.'
+        )
+
     url = f'{api_url}/engines/v1/models'
 
     req = urllib.request.Request(url)
 
     try:
-        with urllib.request.urlopen(
+        with urlopen_no_redirect(
             req, timeout=30, context=SSL_CONTEXT
         ) as response:
             data = json.loads(response.read().decode('utf-8'))
     except urllib.error.URLError as e:
-        raise ConnectionError(
+        raise LLMApiError(
             f'Cannot connect to Docker Model Runner: '
             f'{e.reason}. Is Docker Desktop running '
             f'with model runner enabled?'
         )
-    except OSError as e:
-        raise ConnectionError(
-            f'Error fetching models: {str(e)}'
+    except OSError:
+        raise LLMApiError(
+            'Cannot connect to Docker Model Runner'
         )
 
     models = []
@@ -871,6 +1050,7 @@ def _fetch_docker_models(api_url):
     methods=["GET"],
     endpoint='security_report'
 )
+@permissions_required(AllPermissionTypes.tools_ai)
 @pga_login_required
 def generate_security_report(sid):
     """
@@ -937,6 +1117,7 @@ def generate_security_report(sid):
     endpoint='security_report_stream'
 )
 @pgCSRFProtect.exempt
+@permissions_required(AllPermissionTypes.tools_ai)
 @pga_login_required
 def generate_security_report_stream(sid):
     """
@@ -998,7 +1179,7 @@ def _gather_security_config(conn, manager):
     # Get security-related settings from pg_settings
     settings_query = """
         SELECT name, setting, short_desc, context, source
-        FROM pg_settings
+        FROM pg_catalog.pg_settings
         WHERE name IN (
             -- Connection settings
             'listen_addresses', 'port', 'max_connections',
@@ -1039,7 +1220,7 @@ def _gather_security_config(conn, manager):
     hba_query = """
         SELECT line_number, type, database, user_name, address,
                netmask, auth_method, options, error
-        FROM pg_hba_file_rules
+        FROM pg_catalog.pg_hba_file_rules
         ORDER BY line_number
     """
 
@@ -1055,7 +1236,7 @@ def _gather_security_config(conn, manager):
     superusers_query = """
         SELECT rolname, rolcreaterole, rolcreatedb, rolbypassrls,
                rolconnlimit, rolvaliduntil
-        FROM pg_roles
+        FROM pg_catalog.pg_roles
         WHERE rolsuper = true
         ORDER BY rolname
     """
@@ -1070,7 +1251,7 @@ def _gather_security_config(conn, manager):
     special_roles_query = """
         SELECT rolname, rolsuper, rolcreaterole, rolcreatedb,
                rolreplication, rolbypassrls, rolcanlogin, rolconnlimit
-        FROM pg_roles
+        FROM pg_catalog.pg_roles
         WHERE (rolcreaterole OR rolcreatedb OR rolreplication OR rolbypassrls)
               AND NOT rolsuper
         ORDER BY rolname
@@ -1085,7 +1266,7 @@ def _gather_security_config(conn, manager):
     # Get roles with no password expiry that can login
     no_expiry_query = """
         SELECT rolname, rolvaliduntil
-        FROM pg_roles
+        FROM pg_catalog.pg_roles
         WHERE rolcanlogin = true
           AND (rolvaliduntil IS NULL OR rolvaliduntil = 'infinity')
         ORDER BY rolname
@@ -1100,7 +1281,7 @@ def _gather_security_config(conn, manager):
     # Check for loaded extensions
     extensions_query = """
         SELECT extname, extversion
-        FROM pg_extension
+        FROM pg_catalog.pg_extension
         ORDER BY extname
     """
 
@@ -1122,6 +1303,7 @@ def _gather_security_config(conn, manager):
     methods=["GET"],
     endpoint='database_security_report'
 )
+@permissions_required(AllPermissionTypes.tools_ai)
 @pga_login_required
 def generate_database_security_report(sid, did):
     """
@@ -1190,6 +1372,7 @@ def generate_database_security_report(sid, did):
     endpoint='database_security_report_stream'
 )
 @pgCSRFProtect.exempt
+@permissions_required(AllPermissionTypes.tools_ai)
 @pga_login_required
 def generate_database_security_report_stream(sid, did):
     """
@@ -1250,6 +1433,7 @@ def generate_database_security_report_stream(sid, did):
     methods=["GET"],
     endpoint='schema_security_report'
 )
+@permissions_required(AllPermissionTypes.tools_ai)
 @pga_login_required
 def generate_schema_security_report(sid, did, scid):
     """
@@ -1283,7 +1467,9 @@ def generate_schema_security_report(sid, did, scid):
             )
 
         # Get schema name from scid
-        schema_query = "SELECT nspname FROM pg_namespace WHERE oid = %s"
+        schema_query = (
+            "SELECT nspname FROM pg_catalog.pg_namespace WHERE oid = %s"
+        )
         status, result = conn.execute_dict(schema_query, [scid])
         if not status or not result.get('rows'):
             return make_json_response(
@@ -1330,6 +1516,7 @@ def generate_schema_security_report(sid, did, scid):
     endpoint='schema_security_report_stream'
 )
 @pgCSRFProtect.exempt
+@permissions_required(AllPermissionTypes.tools_ai)
 @pga_login_required
 def generate_schema_security_report_stream(sid, did, scid):
     """
@@ -1362,7 +1549,9 @@ def generate_schema_security_report_stream(sid, did, scid):
             )
 
         # Get schema name from scid
-        schema_query = "SELECT nspname FROM pg_namespace WHERE oid = %s"
+        schema_query = (
+            "SELECT nspname FROM pg_catalog.pg_namespace WHERE oid = %s"
+        )
         status, result = conn.execute_dict(schema_query, [scid])
         if not status or not result.get('rows'):
             return make_json_response(
@@ -1402,6 +1591,7 @@ def generate_schema_security_report_stream(sid, did, scid):
     methods=["GET"],
     endpoint='performance_report'
 )
+@permissions_required(AllPermissionTypes.tools_ai)
 @pga_login_required
 def generate_performance_report(sid):
     """
@@ -1468,6 +1658,7 @@ def generate_performance_report(sid):
     endpoint='performance_report_stream'
 )
 @pgCSRFProtect.exempt
+@permissions_required(AllPermissionTypes.tools_ai)
 @pga_login_required
 def generate_performance_report_stream(sid):
     """
@@ -1526,6 +1717,7 @@ def generate_performance_report_stream(sid):
     methods=["GET"],
     endpoint='database_performance_report'
 )
+@permissions_required(AllPermissionTypes.tools_ai)
 @pga_login_required
 def generate_database_performance_report(sid, did):
     """
@@ -1594,6 +1786,7 @@ def generate_database_performance_report(sid, did):
     endpoint='database_performance_report_stream'
 )
 @pgCSRFProtect.exempt
+@permissions_required(AllPermissionTypes.tools_ai)
 @pga_login_required
 def generate_database_performance_report_stream(sid, did):
     """
@@ -1654,6 +1847,7 @@ def generate_database_performance_report_stream(sid, did):
     methods=["GET"],
     endpoint='database_design_report'
 )
+@permissions_required(AllPermissionTypes.tools_ai)
 @pga_login_required
 def generate_database_design_report(sid, did):
     """
@@ -1722,6 +1916,7 @@ def generate_database_design_report(sid, did):
     endpoint='database_design_report_stream'
 )
 @pgCSRFProtect.exempt
+@permissions_required(AllPermissionTypes.tools_ai)
 @pga_login_required
 def generate_database_design_report_stream(sid, did):
     """
@@ -1782,6 +1977,7 @@ def generate_database_design_report_stream(sid, did):
     methods=["GET"],
     endpoint='schema_design_report'
 )
+@permissions_required(AllPermissionTypes.tools_ai)
 @pga_login_required
 def generate_schema_design_report(sid, did, scid):
     """
@@ -1815,7 +2011,9 @@ def generate_schema_design_report(sid, did, scid):
             )
 
         # Get schema name from scid
-        schema_query = "SELECT nspname FROM pg_namespace WHERE oid = %s"
+        schema_query = (
+            "SELECT nspname FROM pg_catalog.pg_namespace WHERE oid = %s"
+        )
         status, result = conn.execute_dict(schema_query, [scid])
         if not status or not result.get('rows'):
             return make_json_response(
@@ -1862,6 +2060,7 @@ def generate_schema_design_report(sid, did, scid):
     endpoint='schema_design_report_stream'
 )
 @pgCSRFProtect.exempt
+@permissions_required(AllPermissionTypes.tools_ai)
 @pga_login_required
 def generate_schema_design_report_stream(sid, did, scid):
     """
@@ -1894,7 +2093,9 @@ def generate_schema_design_report_stream(sid, did, scid):
             )
 
         # Get schema name from scid
-        schema_query = "SELECT nspname FROM pg_namespace WHERE oid = %s"
+        schema_query = (
+            "SELECT nspname FROM pg_catalog.pg_namespace WHERE oid = %s"
+        )
         status, result = conn.execute_dict(schema_query, [scid])
         if not status or not result.get('rows'):
             return make_json_response(

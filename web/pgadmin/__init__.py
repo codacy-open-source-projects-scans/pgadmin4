@@ -21,7 +21,7 @@ from types import MethodType
 from collections import defaultdict
 from importlib import import_module
 
-from flask import Flask, abort, request, current_app, session, url_for
+from flask import Flask, abort, request, current_app, g, session, url_for
 from flask_socketio import SocketIO
 from werkzeug.exceptions import HTTPException
 from flask_babel import Babel, gettext
@@ -41,6 +41,7 @@ from flask_wtf.csrf import CSRFError
 from pgadmin.model import db, Role, Server, SharedServer, ServerGroup, \
     User, Keys, Version, SCHEMA_VERSION as CURRENT_SCHEMA_VERSION
 from pgadmin.utils import PgAdminModule, driver, KeyManager, heartbeat
+from pgadmin.utils.db_utils import normalize_database_uri
 from pgadmin.utils.preferences import Preferences
 from pgadmin.utils.session import create_session_interface, pga_unauthorised
 from pgadmin.utils.versioned_template_loader import VersionedTemplateLoader
@@ -182,6 +183,36 @@ def _find_blueprint():
 current_blueprint = LocalProxy(_find_blueprint)
 
 
+def _remember_authenticated_user():
+    """Stash the username so a logout within this request doesn't lose it."""
+    if current_app.config.get('LOG_AUTHENTICATED_USER') and \
+            current_user.is_authenticated:
+        g.authenticated_user_name = current_user.username
+
+
+def _set_remote_user_header(response):
+    """Report the authenticated user to the HTTP access log."""
+    if not current_app.config.get('LOG_AUTHENTICATED_USER'):
+        return response
+
+    username = current_user.username if current_user.is_authenticated \
+        else g.get('authenticated_user_name')
+
+    if username:
+        # HTTP headers are latin-1 only, so transliterate anything outside
+        # that range to avoid gunicorn 500s for unicode names.
+        safe = username.encode('latin-1', 'replace').decode('latin-1')
+        # CR/LF and other control chars are valid latin-1 but Werkzeug
+        # rejects them in header values (would 500 every request for that
+        # user), so drop any non-printable characters too.
+        safe = ''.join(c for c in safe if c.isprintable())
+        response.headers['X-Remote-User'] = safe
+    else:
+        response.headers.pop('X-Remote-User', None)
+
+    return response
+
+
 def create_app(app_name=None):
     # Configuration settings
     import config
@@ -209,6 +240,12 @@ def create_app(app_name=None):
         # we don't want it to redirect to main page after password
         # change operation so we will open the same password change page again.
         config.SECURITY_POST_CHANGE_VIEW = 'browser.change_password'
+    else:
+        # Desktop mode: re-check the keyring backend picked at config-load
+        # time is actually usable, without blocking startup on a possible
+        # hang (see pgadmin/keyring_probe.py for why).
+        from pgadmin.utils.keyring_probe import start_async_probe
+        start_async_probe(config.__dict__)
 
     """Create the Flask application, startup logging and dynamically load
     additional modules (blueprints) that are found in this directory."""
@@ -337,7 +374,8 @@ def create_app(app_name=None):
     ##########################################################################
     if config.CONFIG_DATABASE_URI is not None and \
             len(config.CONFIG_DATABASE_URI) > 0:
-        app.config['SQLALCHEMY_DATABASE_URI'] = config.CONFIG_DATABASE_URI
+        app.config['SQLALCHEMY_DATABASE_URI'] = \
+            normalize_database_uri(config.CONFIG_DATABASE_URI)
     else:
         app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///{0}?timeout={1}' \
             .format(config.SQLITE_PATH.replace('\\', '/'),
@@ -403,50 +441,67 @@ def create_app(app_name=None):
             backup_db_file()
 
     def run_migration_for_sqlite():
-        # Run migration for the first time i.e. create database
-        # If version not available, user must have aborted. Tables are not
-        # created and so its an empty db
-        if not os.path.exists(SQLITE_PATH) or get_version() == -1:
-            # If running in cli mode then don't try to upgrade, just raise
-            # the exception
-            if not cli_mode:
-                upgrade_db()
+        # Tighten the process umask while we may be creating the SQLite
+        # DB file. The post-hoc chmod below sets 0o600, but only AFTER
+        # SQLAlchemy/SQLite has already created the file with the
+        # umask-default mode (0o644 on a typical 0o022 umask). That's a
+        # TOCTOU window — small in practice because the parent dir is
+        # 0o700, but easy to close. With umask 0o077 in effect during
+        # creation, the file is born 0o600.
+        _saved_umask = os.umask(0o077)
+        try:
+            # Run migration for the first time i.e. create database
+            # If version not available, user must have aborted. Tables
+            # are not created and so its an empty db
+            if not os.path.exists(SQLITE_PATH) or get_version() == -1:
+                # If running in cli mode then don't try to upgrade, just
+                # raise the exception
+                if not cli_mode:
+                    upgrade_db()
+                else:
+                    if not os.path.exists(SQLITE_PATH):
+                        raise FileNotFoundError(
+                            'SQLite database file "' + SQLITE_PATH +
+                            '" does not exists.')
+                    raise RuntimeError(
+                        'The configuration database file is not valid.')
             else:
-                if not os.path.exists(SQLITE_PATH):
-                    raise FileNotFoundError(
-                        'SQLite database file "' + SQLITE_PATH +
-                        '" does not exists.')
-                raise RuntimeError(
-                    'The configuration database file is not valid.')
-        else:
-            schema_version = get_version()
+                schema_version = get_version()
 
-            # Run migration if current schema version is greater than the
-            # schema version stored in version table
-            if CURRENT_SCHEMA_VERSION > schema_version:
-                # Take a backup of the old database file.
-                try:
-                    prev_database_file_name = \
-                        "{0}.prev.bak".format(SQLITE_PATH)
-                    shutil.copyfile(SQLITE_PATH, prev_database_file_name)
-                except Exception as e:
-                    app.logger.error(e)
+                # Run migration if current schema version is greater than
+                # the schema version stored in version table
+                if CURRENT_SCHEMA_VERSION > schema_version:
+                    # Take a backup of the old database file.
+                    try:
+                        prev_database_file_name = \
+                            "{0}.prev.bak".format(SQLITE_PATH)
+                        shutil.copyfile(
+                            SQLITE_PATH, prev_database_file_name)
+                    except Exception as e:
+                        app.logger.error(e)
 
-                upgrade_db()
-            else:
-                # check all tables are present in the db.
-                is_db_error, invalid_tb_names = check_db_tables()
-                if is_db_error:
-                    app.logger.error(
-                        'Table(s) {0} are missing in the'
-                        ' database'.format(invalid_tb_names))
-                    backup_db_file()
+                    upgrade_db()
+                else:
+                    # check all tables are present in the db.
+                    is_db_error, invalid_tb_names = check_db_tables()
+                    if is_db_error:
+                        app.logger.error(
+                            'Table(s) {0} are missing in the'
+                            ' database'.format(invalid_tb_names))
+                        backup_db_file()
 
-            # Update schema version to the latest
-            if CURRENT_SCHEMA_VERSION > schema_version:
-                set_version(CURRENT_SCHEMA_VERSION)
-                db.session.commit()
+                # Update schema version to the latest
+                if CURRENT_SCHEMA_VERSION > schema_version:
+                    set_version(CURRENT_SCHEMA_VERSION)
+                    db.session.commit()
+        finally:
+            # Always restore the prior umask — including the exception
+            # paths above, so a migration failure doesn't leave the
+            # whole process running with 0o077.
+            os.umask(_saved_umask)
 
+        # Belt-and-suspenders: covers the case where the file already
+        # existed at a wider mode from an older install.
         if os.name != 'nt':
             os.chmod(config.SQLITE_PATH, 0o600)
 
@@ -478,7 +533,15 @@ def create_app(app_name=None):
             run_migration_for_sqlite()
 
         # Delete all the adhoc(temporary) servers from the pgAdmin database.
-        delete_adhoc_servers()
+        # Adhoc servers are created by interactive tools (Schema Diff,
+        # Query Tool ad-hoc connections, etc.) — they have no meaning
+        # in CLI sessions (`setup.py update-user`, etc.) and accessing
+        # `current_user` inside the user-scoped cleanup branch would
+        # fail with `AttributeError: 'PgAdmin' object has no attribute
+        # 'login_manager'` because Flask-Security has not yet been
+        # initialised at this point in create_app.
+        if not cli_mode:
+            delete_adhoc_servers()
 
     Mail(app)
 
@@ -805,6 +868,10 @@ def create_app(app_name=None):
     def before_request():
         """Login the default user if running in desktop mode"""
 
+        # current_user is already anonymous by the time after_request runs on
+        # a logout, so remember who made the request while we still can.
+        _remember_authenticated_user()
+
         # Check the auth key is valid, if it's set, and we're not in server
         # mode, and it's not a help file request.
 
@@ -846,6 +913,8 @@ def create_app(app_name=None):
 
     @app.after_request
     def after_request(response):
+        _set_remote_user_header(response)
+
         if 'key' in request.args:
             domain = dict()
             if config.COOKIE_DEFAULT_DOMAIN and \
@@ -911,6 +980,9 @@ def create_app(app_name=None):
         return {
             'current_app': current_app,
             'current_blueprint': current_blueprint,
+            # Per-request Content-Security-Policy nonce, for use on inline
+            # <script>/<style> tags when a nonce based CSP is configured.
+            'csp_nonce': SecurityHeaders.get_nonce(),
         }
 
     @app.errorhandler(Exception)

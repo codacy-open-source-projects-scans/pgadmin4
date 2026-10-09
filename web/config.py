@@ -144,8 +144,40 @@ CROSS_ORIGIN_OPENER_POLICY = "same-origin"
 # such as JavaScript, CSS, or pretty much anything that the browser loads.
 # see https://content-security-policy.com/#source_list for more info
 # e.g. "default-src https: data: 'unsafe-inline' 'unsafe-eval';"
-CONTENT_SECURITY_POLICY = "default-src ws: http: data: blob: 'unsafe-inline'" \
-                          " 'unsafe-eval';"
+#
+# A per-request nonce is used in place of 'unsafe-inline' for scripts. The
+# literal token {nonce} anywhere in the policy is replaced at runtime with a
+# freshly generated nonce that is also emitted on pgAdmin's inline <script>
+# tags. To go back to the old permissive policy, set:
+#   CONTENT_SECURITY_POLICY = "default-src ws: http: data: blob:" \
+#                             " 'unsafe-inline' 'unsafe-eval';"
+# Notes:
+#  - 'unsafe-inline' is retained for style-src because pgAdmin's UI (React/MUI)
+#    injects runtime styles and inline style="" attributes that are not (and
+#    cannot be) nonce tagged. WARNING: do NOT add 'nonce-{nonce}' to style-src
+#    to tighten this -- per the CSP spec a nonce silently DISABLES
+#    'unsafe-inline', which blocks all of MUI's runtime styles and leaves the
+#    UI unstyled.
+#  - 'unsafe-eval' is NOT listed: production bundles do not need it. This holds
+#    only because JsonEditor.jsx passes neither 'queryLanguages' nor a
+#    'validator' to vanilla-jsoneditor: its default query language (JSONQuery)
+#    composes closures rather than evaluating source, so the eval-capable
+#    paths (jsonpath-plus, ajv's runtime compiler and the Lodash query
+#    language) stay unreachable. Enabling schema validation or registering
+#    another query language would make 'unsafe-eval' necessary again.
+#  - Development webpack bundles ARE built with the 'eval' devtool and need
+#    'unsafe-eval'. security_headers.py adds it automatically when DEBUG is
+#    True (for a nonce based policy), so no manual change is needed for the
+#    dev server. Security note: turning DEBUG on in a server-mode deployment
+#    therefore relaxes the policy (drops eval protection), and this is not
+#    logged.
+CONTENT_SECURITY_POLICY = (
+    "default-src 'self' ws: http: data: blob:;"
+    " script-src 'self' 'nonce-{nonce}';"
+    " style-src 'self' 'unsafe-inline';"
+    " object-src 'none';"
+    " base-uri 'self';"
+)
 
 # STRICT_TRANSPORT_SECURITY_ENABLED when set to True will set the
 # Strict-Transport-Security header
@@ -301,6 +333,9 @@ else:
 LOG_ROTATION_SIZE = 10  # In MBs
 LOG_ROTATION_AGE = 1440  # In minutes
 LOG_ROTATION_MAX_LOG_FILES = 90  # Maximum number of backups to retain
+# Include the authenticated username in the X-Remote-User response header so
+# it can be captured in the HTTP access log. Disabled by default.
+LOG_AUTHENTICATED_USER = False
 ##########################################################################
 # Server Connection Driver Settings
 ##########################################################################
@@ -376,8 +411,16 @@ SESSION_DB_PATH = os.path.join(DATA_DIR, 'sessions')
 
 SESSION_COOKIE_NAME = 'pga4_session'
 
-# Session digest method
-SESSION_DIGEST_METHOD = 'hashlib.sha1'
+# Session digest method.
+# Used as the HMAC algorithm for the session cookie (signing the
+# (sid, randval) pair). HMAC-SHA1 is still cryptographically acceptable
+# for authentication, but SHA-256 is the modern default and aligns with
+# the file-HMAC header introduced for session-on-disk integrity.
+# Operators on existing deployments will see all sessions invalidated on
+# upgrade regardless (the file-HMAC header is new), so we flip this
+# default at the same time rather than leaving SHA-1 as a long-term
+# liability.
+SESSION_DIGEST_METHOD = 'hashlib.sha256'
 
 ##########################################################################
 # Mail server settings
@@ -536,6 +579,26 @@ SQLALCHEMY_TRACK_MODIFICATIONS = False
 DATA_RESULT_ROWS_PER_PAGE = 1000
 
 ##########################################################################
+# System-wide default for the Geometry Viewer's custom tile provider
+# (Query Tool > Data Output > Geometry Viewer). Applies to any user who
+# has not saved their own "Custom tile provider ..." preference; a
+# per-user preference, once set, always takes precedence over this
+# default. Leave "url" empty to keep using the built-in tile layers by
+# default (the pre-existing behaviour).
+#
+# "crs" must be one of "EPSG:3857" (Web Mercator), "EPSG:4326", or
+# "EPSG:3395" - the only coordinate reference systems the Geometry
+# Viewer's tile layer selector supports.
+##########################################################################
+DEFAULT_GEOMETRY_VIEWER_PROVIDER = {
+    "url": "",
+    "name": "Custom",
+    "crs": "EPSG:3857",
+    "attribution": "",
+    "max_zoom": 18
+}
+
+##########################################################################
 # Allow users to display Gravatar image for their username in Server mode
 ##########################################################################
 SHOW_GRAVATAR_IMAGE = True
@@ -625,6 +688,14 @@ USE_OS_SECRET_STORAGE = True
 # You can pass the current username as an argument to the external script
 # by specifying %u in config value.
 # E.g. - MASTER_PASSWORD_HOOK = '<PATH>/passwdgen_script.sh %u'
+#
+# The command is split into arguments and executed directly, without a
+# shell, so shell features (pipes, redirection, environment-variable
+# expansion, globbing) in this value are not interpreted; put any such
+# logic inside the hook script itself. On Windows, a batch file must be
+# invoked via an executable wrapper rather than directly. If the path to
+# the script/program contains spaces, quote it, e.g. -
+# MASTER_PASSWORD_HOOK = '"<PATH WITH SPACES>/passwdgen_script.exe" %u'
 ##########################################################################
 MASTER_PASSWORD_HOOK = None
 
@@ -814,7 +885,10 @@ OAUTH2_CONFIG = [
         # URL is used for authentication,
         # Ex: https://github.com/login/oauth/authorize
         'OAUTH2_AUTHORIZATION_URL': None,
-        # server metadata url might optional for your provider
+        # OpenID Connect discovery URL for the provider. Required when
+        # OAUTH2_SCOPE contains 'openid' (so pgAdmin can fetch the JWKS
+        # to verify the id_token); optional otherwise.
+        # Example: https://<issuer>/.well-known/openid-configuration
         'OAUTH2_SERVER_METADATA_URL': None,
         # Oauth base url, ex: https://api.github.com/
         'OAUTH2_API_BASE_URL': None,
@@ -852,6 +926,21 @@ OAUTH2_CONFIG = [
         #     'wids': ["cf1c38e5-3621-4004-a7cb-879624dced7c"],
         # }
         'OAUTH2_ADDITIONAL_CLAIMS': None,
+        # The claim listing the server groups whose shared servers the user
+        # may see (ID token first, then userinfo). When set, shared servers
+        # owned by other users are only visible if their server group's name
+        # is in the claim; if the claim is missing, none are. The user's own
+        # servers are unaffected. Names are matched exactly, and the claim
+        # is only read at login.
+        # Without mapping, claim values are treated as server group names.
+        # Example:
+        # 'OAUTH2_SERVER_GROUP_CLAIM': 'pgadmin_server_groups',
+        # Optional mapping from claim value -> server group name(s):
+        # 'OAUTH2_SERVER_GROUP_CLAIM_MAPPING': {
+        #     'readonly': ['RO Server 1', 'RO Server 2']
+        # },
+        'OAUTH2_SERVER_GROUP_CLAIM': None,
+        'OAUTH2_SERVER_GROUP_CLAIM_MAPPING': None,
         # Set this variable to False to disable SSL certificate verification
         # for OAuth2 provider.
         # This may need to set False, in case of self-signed certificates.
@@ -884,6 +973,26 @@ WEBSERVER_AUTO_CREATE_USER = True
 # Possible values: REMOTE_USER, HTTP_X_FORWARDED_USER, X-Forwarded-User
 
 WEBSERVER_REMOTE_USER = 'REMOTE_USER'
+
+# Accept the remote user identity from an inbound HTTP request header (not
+# just the WSGI/CGI environment). This is required only for reverse proxies
+# that pass the identity as a header rather than setting the REMOTE_USER
+# CGI variable.
+# SECURITY: only enable this when the proxy in front of pgAdmin OVERWRITES
+# this header on every request before it reaches pgAdmin; otherwise any
+# client that can reach pgAdmin can assert any identity it likes.
+WEBSERVER_REMOTE_USER_FROM_HEADER = False
+
+# IP addresses/CIDR ranges of the reverse proxies that are allowed to assert
+# the identity header above. An empty list means no peer is trusted, so
+# WEBSERVER_REMOTE_USER_FROM_HEADER stays inert even if enabled.
+WEBSERVER_TRUSTED_PROXIES = []
+
+# Optional shared secret that the trusted proxy must inject into the request
+# (in the header named by WEBSERVER_SHARED_SECRET_HEADER) for the header-based
+# identity to be accepted. Leave as None to skip this additional check.
+WEBSERVER_SHARED_SECRET = None
+WEBSERVER_SHARED_SECRET_HEADER = 'X-Pgadmin-Webserver-Secret'
 
 ##########################################################################
 # Two-factor Authentication Configuration
@@ -1043,6 +1152,34 @@ DOCKER_API_URL = ''
 # The Docker Model Runner model to use for AI features.
 # Examples: ai/qwen3-coder, ai/llama3.2
 DOCKER_API_MODEL = ''
+
+# Allowed LLM API URLs
+# A list of scheme://host:port entries that LLM API requests are allowed
+# to connect to. Only URLs matching an entry in this list will be permitted.
+# This prevents SSRF attacks via user-controlled API URL fields.
+# Set to an empty list to disable URL restriction (not recommended).
+# Add entries for custom providers (LiteLLM, LM Studio, corporate proxies).
+#
+# Use ``:*`` to match any port on a host — useful for local self-hosting
+# where the user chooses the port. The host check still rejects
+# link-local addresses like 169.254.169.254 used by cloud metadata.
+#
+# Note: the loopback ``:*`` entries below let any logged-in user have
+# the pgAdmin server connect to any port on its own loopback interface.
+# On multi-user SERVER_MODE deployments, consider replacing them with
+# the specific ports you run (e.g. ``http://localhost:11434``) to avoid
+# exposing other local services to LLM requests.
+ALLOWED_LLM_API_URLS = [
+    'https://api.anthropic.com:443',
+    'https://api.openai.com:443',
+    # Loopback addresses on any port: covers Ollama (11434), Docker
+    # Model Runner (12434), LiteLLM (4000), vLLM (8000), LM Studio
+    # (1234), text-generation-webui (5000), and any self-hosted
+    # OpenAI-compatible endpoint the user runs on their own machine.
+    'http://localhost:*',
+    'http://127.0.0.1:*',
+    'http://[::1]:*',
+]
 
 # Maximum Tool Iterations
 # The maximum number of tool call iterations allowed during an AI conversation.

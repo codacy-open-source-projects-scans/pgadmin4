@@ -390,7 +390,7 @@ CREATE VIEW test_schema_diff."test view" AS
     pg_class.relfilenode,
     pg_class.reltablespace,
     pg_class.relpages
-   FROM pg_class
+   FROM pg_catalog.pg_class
  LIMIT 10;
 
 
@@ -1159,3 +1159,17 @@ ALTER SUBSCRIPTION subscription_test1
     RENAME TO subscription_test;
 
 DROP SUBSCRIPTION subscription_test;
+
+
+--
+-- Name: statistics_identical; Type: STATISTICS; Schema: test_schema_diff; Owner: postgres
+--
+
+CREATE STATISTICS test_schema_diff.statistics_identical (ndistinct, dependencies) ON col1, col2 FROM test_schema_diff.table_for_identical;
+
+
+--
+-- Name: statistics_only_in_source; Type: STATISTICS; Schema: test_schema_diff; Owner: postgres
+--
+
+CREATE STATISTICS test_schema_diff.statistics_only_in_source (ndistinct) ON col1, (lower(col2)) FROM test_schema_diff.table_for_index;

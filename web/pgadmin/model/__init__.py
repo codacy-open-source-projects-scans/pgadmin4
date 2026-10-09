@@ -18,6 +18,7 @@ things:
    made to the config database to upgrade it to the new version.
 """
 
+from flask_babel import gettext
 from flask_security import UserMixin, RoleMixin
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy.ext.mutable import MutableDict
@@ -33,7 +34,7 @@ import config
 #
 ##########################################################################
 
-SCHEMA_VERSION = 51
+SCHEMA_VERSION = 52
 
 ##########################################################################
 #
@@ -211,6 +212,31 @@ class User(db.Model, UserMixin):
     login_attempts = db.Column(db.Integer, default=0)
     locked = db.Column(db.Boolean(), default=False)
 
+    @property
+    def is_active(self):
+        # Treat a locked account as inactive so Flask-Login's login_user()
+        # refuses to mint a session, regardless of which view authenticated
+        # the password. Without this, a lockout set by /authenticate/login
+        # is bypassed by a direct POST to Flask-Security's /login.
+        return self.active and not self.locked
+
+    def is_locked(self, form_error=None):
+        # Flask-Security's LoginForm.validate() calls this after password
+        # verification and fails validation when it returns True, so True
+        # means "locked, refuse the login". Flask-Security-Too up to and
+        # including 5.8.1 had that test inverted (fixed upstream in 5.8.2 by
+        # pallets-eco/flask-security#1267), which is why requirements.txt
+        # floors the dependency at 5.8.2: on an older release the value
+        # below would be read backwards and every unlocked user would be
+        # refused a session.
+        if self.locked:
+            if form_error is not None:
+                form_error.append(gettext(
+                    'Your account is locked. Please contact the '
+                    'Administrator.'))
+            return True
+        return False
+
 
 class Setting(db.Model, UserScopedMixin):
     """Define a setting object"""
@@ -228,6 +254,20 @@ class ServerGroup(db.Model, UserScopedMixin):
 
     name = db.Column(db.String(128), nullable=False)
     __table_args__ = (db.UniqueConstraint('user_id', 'name'),)
+
+    servers = db.relationship(
+        'Server',
+        back_populates='servergroup',
+        lazy='select',
+        cascade=CASCADE_STR
+    )
+
+    sharedservers = db.relationship(
+        'SharedServer',
+        back_populates='servergroup',
+        lazy='select',
+        cascade=CASCADE_STR
+    )
 
     @property
     def serialize(self):
@@ -253,6 +293,11 @@ class Server(db.Model, UserScopedMixin):
         db.ForeignKey('servergroup.id'),
         nullable=False
     )
+    servergroup = db.relationship(
+        'ServerGroup',
+        back_populates='servers',
+        lazy='joined'
+    )
     name = db.Column(db.String(128), nullable=False)
     host = db.Column(db.String(128), nullable=True)
     port = db.Column(
@@ -270,11 +315,6 @@ class Server(db.Model, UserScopedMixin):
     role = db.Column(db.String(64), nullable=True)
     comment = db.Column(db.String(1024), nullable=True)
     discovery_id = db.Column(db.String(128), nullable=True)
-    servers = db.relationship(
-        'ServerGroup',
-        backref=db.backref('server', cascade=CASCADE_STR),
-        lazy='joined'
-    )
     db_res = db.Column(db.Text(), nullable=True)
     db_res_type = db.Column(db.String(32), default='databases')
     passexec_cmd = db.Column(db.Text(), nullable=True)
@@ -507,6 +547,11 @@ class SharedServer(db.Model, UserScopedMixin):
         db.ForeignKey('servergroup.id'),
         nullable=False
     )
+    servergroup = db.relationship(
+        'ServerGroup',
+        back_populates='sharedservers',
+        lazy='joined'
+    )
     name = db.Column(db.String(128), nullable=False)
     host = db.Column(db.String(128), nullable=True)
     port = db.Column(
@@ -523,11 +568,6 @@ class SharedServer(db.Model, UserScopedMixin):
     role = db.Column(db.String(64), nullable=True)
     comment = db.Column(db.String(1024), nullable=True)
     discovery_id = db.Column(db.String(128), nullable=True)
-    servers = db.relationship(
-        'ServerGroup',
-        backref=db.backref('sharedserver', cascade=CASCADE_STR),
-        lazy='joined'
-    )
     bgcolor = db.Column(db.String(10), nullable=True)
     fgcolor = db.Column(db.String(10), nullable=True)
     service = db.Column(db.Text(), nullable=True)

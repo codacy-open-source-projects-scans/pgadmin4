@@ -33,6 +33,7 @@ from pgadmin.llm.models import (
     Message, Tool, ToolCall, LLMResponse, LLMError,
     Role, StopReason, Usage
 )
+from pgadmin.llm.utils import urlopen_no_redirect
 
 
 # Default model if none specified
@@ -373,7 +374,7 @@ class OpenAIClient(LLMClient):
         )
 
         try:
-            with urllib.request.urlopen(
+            with urlopen_no_redirect(
                 request, timeout=120, context=SSL_CONTEXT
             ) as response:
                 return json.loads(response.read().decode('utf-8'))
@@ -667,7 +668,7 @@ class OpenAIClient(LLMClient):
         )
 
         try:
-            response = urllib.request.urlopen(
+            response = urlopen_no_redirect(
                 request, timeout=120, context=SSL_CONTEXT
             )
         except urllib.error.HTTPError as e:
@@ -780,12 +781,16 @@ class OpenAIClient(LLMClient):
                         'id': '', 'name': '', 'arguments': ''
                     }
                 tc = tool_calls_data[idx]
-                if 'id' in tc_delta:
+                # Some providers emit empty/null fields in continuation
+                # deltas to keep the schema stable; skip them so a later
+                # null doesn't clobber the real id/name captured earlier
+                # (see the OpenAI SDK, which skips nulls the same way).
+                if tc_delta.get('id'):
                     tc['id'] = tc_delta['id']
-                func = tc_delta.get('function', {})
-                if 'name' in func:
+                func = tc_delta.get('function') or {}
+                if func.get('name'):
                     tc['name'] = func['name']
-                if 'arguments' in func:
+                if func.get('arguments'):
                     tc['arguments'] += func['arguments']
 
         # Build final response

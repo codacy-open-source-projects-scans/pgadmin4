@@ -46,7 +46,7 @@ function getColumn(data, singleLineStatistics, prettifyFields=[]) {
           enableSorting: true,
           enableResizing: true,
           enableFilters: true,
-          sortingFn: 'alphanumeric',
+          sortFn: 'alphanumeric',
         });
       });
     }
@@ -192,7 +192,7 @@ function Statistics({ nodeData, nodeItem, node, treeNodeInfo, isActive, isStale,
                 }, 100);
               });
             } else {
-              pgAdmin.Browser.notifier.alert(
+              pgAdmin.Browser.notifier.alertText(
                 gettext('Failed to retrieve data from the server.'),
                 parseApiError(err)
               );

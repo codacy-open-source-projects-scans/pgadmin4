@@ -65,6 +65,24 @@ def _is_non_owner(server):
     return server.shared and server.user_id != current_user.id
 
 
+def is_using_passfile(server, manager):
+    """
+    True if the connection authenticates through the configured passfile,
+    i.e. no password is saved or held for the session and the manager uses
+    the server's passfile. The Change Password dialog (check_pgpass) and
+    the change_password endpoint must agree on this, so both call it.
+    """
+    passfile = manager.get_connection_param_value('passfile')
+    return bool(
+        not server.password and not manager.password and
+        hasattr(server, 'connection_params') and
+        server.connection_params and
+        'passfile' in server.connection_params and
+        passfile and
+        server.connection_params['passfile'] == passfile
+    )
+
+
 def has_any(data, keys):
     """
     Checks any one of the keys present in the data given
@@ -389,6 +407,9 @@ class ServerModule(sg.ServerGroupPluginModule):
         self.submodules.append(module)
 
         from .pgagent import blueprint as module
+        self.submodules.append(module)
+
+        from .pg_timetable import blueprint as module
         self.submodules.append(module)
 
         from .resource_groups import blueprint as module
@@ -798,7 +819,7 @@ class ServerNode(PGChildNodeView):
             current_app.logger.exception(e)
             return make_json_response(
                 success=0,
-                errormsg=e.message)
+                errormsg=str(e))
 
     @pga_login_required
     def delete(self, gid, sid):
@@ -831,7 +852,7 @@ class ServerNode(PGChildNodeView):
                 current_app.logger.exception(e)
                 return make_json_response(
                     success=0,
-                    errormsg=e.message)
+                    errormsg=str(e))
 
         return make_json_response(success=1,
                                   info=gettext("Server deleted"))
@@ -949,7 +970,7 @@ class ServerNode(PGChildNodeView):
             current_app.logger.exception(e)
             return make_json_response(
                 success=0,
-                errormsg=e.message
+                errormsg=str(e)
             )
 
         # When server is connected, we don't require to update the connection
@@ -1057,6 +1078,7 @@ class ServerNode(PGChildNodeView):
                     )
 
     @pga_login_required
+    @with_object_filters
     def list(self, gid, object_filters):
         """
         Return list of attributes of all servers.
@@ -1266,8 +1288,17 @@ class ServerNode(PGChildNodeView):
                     ).format(arg)
                 )
 
-        connection_params = convert_connection_parameter(
-            data.get('connection_params', []))
+        # convert_connection_parameter() is bidirectional: list->dict for
+        # save (frontend shape), dict->list for display (DB shape). Here
+        # we want the storage shape (dict). If the input is already a
+        # dict (e.g. from internal callers / tests that mimic stored
+        # form), keep it as-is; otherwise assume frontend list shape and
+        # convert.
+        raw_params = data.get('connection_params', [])
+        if isinstance(raw_params, dict):
+            connection_params = raw_params
+        else:
+            connection_params = convert_connection_parameter(raw_params)
 
         if 'hostaddr' in connection_params and \
                 not is_valid_ipaddress(connection_params['hostaddr']):
@@ -1744,7 +1775,7 @@ class ServerNode(PGChildNodeView):
                     manager.release(database=server.maintenance_db)
                     conn = None
 
-                    return internal_server_error(errormsg=e.message)
+                    return internal_server_error(errormsg=str(e))
 
             if save_tunnel_password and config.ALLOW_SAVE_TUNNEL_PASSWORD:
                 try:
@@ -1761,7 +1792,7 @@ class ServerNode(PGChildNodeView):
                     manager.release(database=server.maintenance_db)
                     conn = None
 
-                    return internal_server_error(errormsg=e.message)
+                    return internal_server_error(errormsg=str(e))
 
             current_app.logger.info('Connection Established for server: \
                 %s - %s' % (server.id, server.name))
@@ -1837,7 +1868,9 @@ class ServerNode(PGChildNodeView):
 
         if conn.connected():
             # Execute the command for reload configuration for the server
-            status, _ = conn.execute_scalar("SELECT pg_reload_conf();")
+            status, _ = conn.execute_scalar(
+                "SELECT pg_catalog.pg_reload_conf();"
+            )
 
             if not status:
                 return internal_server_error(
@@ -1875,13 +1908,15 @@ class ServerNode(PGChildNodeView):
             manager = get_driver(PG_DEFAULT_DRIVER).connection_manager(sid)
             conn = manager.connection()
 
-            # Execute SQL to create named restore point
+            # Execute SQL to create named restore point. The name is
+            # passed as a bound parameter rather than string-formatted
+            # into the SQL, so a malicious value cannot escape the
+            # quoted literal and inject additional statements.
             if conn.connected():
                 if restore_point_name:
                     status, res = conn.execute_scalar(
-                        "SELECT pg_create_restore_point('{0}');".format(
-                            restore_point_name
-                        )
+                        "SELECT pg_catalog.pg_create_restore_point(%s);",
+                        (restore_point_name,)
                     )
                     if not status:
                         return internal_server_error(
@@ -1936,17 +1971,7 @@ class ServerNode(PGChildNodeView):
 
             manager = get_driver(PG_DEFAULT_DRIVER).connection_manager(sid)
             conn = manager.connection()
-            is_passfile = False
-
-            # If there is no password found for the server
-            # then check for pgpass file
-            if not server.password and not manager.password and \
-                hasattr(server, 'connection_params') and \
-                'passfile' in server.connection_params and \
-                manager.get_connection_param_value('passfile') and \
-                server.connection_params['passfile'] == \
-                    manager.get_connection_param_value('passfile'):
-                is_passfile = True
+            is_passfile = is_using_passfile(server, manager)
 
             # Check for password only if there is no pgpass file used
             if not is_passfile and data and \
@@ -2064,9 +2089,9 @@ class ServerNode(PGChildNodeView):
             # Execute SQL to pause or resume WAL replay
             if conn.connected():
                 if pause:
-                    sql = "SELECT pg_xlog_replay_pause();"
+                    sql = "SELECT pg_catalog.pg_xlog_replay_pause();"
                     if manager.version >= 100000:
-                        sql = "SELECT pg_wal_replay_pause();"
+                        sql = "SELECT pg_catalog.pg_wal_replay_pause();"
 
                     status, res = conn.execute_scalar(sql)
                     if not status:
@@ -2075,9 +2100,9 @@ class ServerNode(PGChildNodeView):
                         )
                     msg = gettext('WAL replay paused')
                 else:
-                    sql = "SELECT pg_xlog_replay_resume();"
+                    sql = "SELECT pg_catalog.pg_xlog_replay_resume();"
                     if manager.version >= 100000:
-                        sql = "SELECT pg_wal_replay_resume();"
+                        sql = "SELECT pg_catalog.pg_wal_replay_resume();"
 
                     status, res = conn.execute_scalar(sql)
                     if not status:
@@ -2132,7 +2157,6 @@ class ServerNode(PGChildNodeView):
             gid: Group id
             sid: Server id
         """
-        is_pgpass = False
         server = get_server(sid)
 
         if server is None:
@@ -2149,13 +2173,7 @@ class ServerNode(PGChildNodeView):
                     errormsg=gettext('Please connect to the server.')
                 )
 
-            if (not server.password or not manager.password) and \
-                hasattr(server, 'connection_params') and \
-                'passfile' in server.connection_params and \
-                manager.get_connection_param_value('passfile') and \
-                server.connection_params['passfile'] == \
-                    manager.get_connection_param_value('passfile'):
-                is_pgpass = True
+            is_pgpass = is_using_passfile(server, manager)
             return make_json_response(
                 success=1,
                 data=dict({'is_pgpass': is_pgpass}),

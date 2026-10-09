@@ -157,6 +157,9 @@ class SchemaModule(CollectionNodeModule):
         from .sequences import blueprint as module
         self.submodules.append(module)
 
+        from .statistics import blueprint as module
+        self.submodules.append(module)
+
         from .synonyms import blueprint as module
         self.submodules.append(module)
 
@@ -800,7 +803,8 @@ It may have been removed by another user.
                 SQL = render_template(
                     "/".join([self.template_path, 'sql/get_name.sql']),
                     _=gettext,
-                    scid=scid
+                    scid=scid,
+                    conn=self.conn
                 )
 
                 status, name = self.conn.execute_scalar(SQL)

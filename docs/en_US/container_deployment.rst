@@ -157,14 +157,17 @@ of the `Preferences JSON file <https://www.pgadmin.org/docs/pgadmin4/latest/pref
 
 Override the default file path for the pgadmin configurations file.This can be used while provisioning
 container with read only root file system to achieve a more secure pgadmin4 deployment for kubernetes.
-Note that if you are externally mapping this file, then environment variables passed using *PGADMIN_CONFIG_*
-suffix will be ignored.
+Note that if you are externally mapping this file, then environment variables
+passed using *PGADMIN_CONFIG_* suffix will be ignored only when that file
+exists and is non-empty. A missing or empty file is generated with those
+values.
 
 **PGPASS_FILE**
 
 *Default: <null>*
-This varible should be set to if you want to pass password using pgpass
-file for the servers added in pgadmin.
+Set this variable to the path of a pgpass file if you want to supply passwords
+for the servers added in pgAdmin. On startup, the file is copied into the
+container and used as the ``.pgpass`` file.
 
 **GUNICORN_ACCESS_LOGFILE**
 
@@ -194,20 +197,62 @@ where it may be increased.
 
 This is a variable prefix that can be used to override any of the configuration
 options in pgAdmin's *config.py* file. Add the *PGADMIN_CONFIG_* prefix to any
-variable name from *config.py* and give the value in the format 'string value'
-for strings, True/False for booleans or 123 for numbers. See below for an
-example.
+variable name from *config.py* and give the value as a Python expression:
+``'string value'`` (including the quotes) for strings, ``True`` or ``False``
+for booleans, or ``123`` for numbers. See below for an example.
 
-Settings are written to */pgadmin4/config_distro.py* within the container, which
-is read after */pgadmin4/config.py* and before */pgadmin4/config_local.py*.
-Any settings given will therefore override anything in config.py, but can be
-overridden by settings in config_local.py.
+*PGADMIN_DEFAULT_* variables, including *PGADMIN_DEFAULT_EMAIL* and
+*PGADMIN_DEFAULT_PASSWORD*, are ordinary text and take no Python literal
+quotes. *PGADMIN_CONFIG_* values are written as Python code into
+*/pgadmin4/config_distro.py*, or into the file named by
+*PGADMIN_CUSTOM_CONFIG_DISTRO_FILE* if that is set. The values ``true`` and
+``false``, in any letter case, are written as ``True`` and ``False``. A bare
+hostname is a Python name, so ``MAIL_SERVER = mail.example.com`` raises
+``NameError`` at startup.
 
-Settings are only written to */pgadmin4/config_distro.py* once, typically on
-first launch of the container. If */pgadmin4/config_distro.py* contains one or
-more lines, then no changes are made; for example, if the container instance is
-restarted, or */pgadmin4/config_distro.py* is mapped to a file on persistent
-storage (not recommended - use */pgadmin4/config_local.py* instead)!
+Quoting added by the shell or by YAML sits outside that Python expression and
+is removed before the value is written. The *docker run* example below keeps
+the Python quotes inside shell quotes, for example
+``-e 'PGADMIN_CONFIG_LOGIN_BANNER="Authorised users only!"'``.
+
+In Docker Compose map syntax, YAML consumes the quotes around a scalar. A
+YAML-only quoted hostname, ``PGADMIN_CONFIG_MAIL_SERVER: "mail.example.com"``
+or ``PGADMIN_CONFIG_MAIL_SERVER: 'mail.example.com'``, reaches the container
+as ``mail.example.com`` and cannot serve as a Python string. Nest the Python
+quotes inside the scalar:
+``PGADMIN_CONFIG_MAIL_SERVER: "'mail.example.com'"``. The container then
+writes ``MAIL_SERVER = 'mail.example.com'``. ``"587"`` and ``"True"`` are
+already valid Python, so they need no nested quotes. The list form keeps
+single quotes, as ``docker run -e`` does
+(``- PGADMIN_CONFIG_MAIL_SERVER='mail.example.com'``); nesting them there
+produces ``"'mail.example.com'"``, which is valid Python but puts stray
+quote characters into the value and fails silently rather than at startup.
+An ``env_file`` value strips one layer of quotes, so the same nesting as the
+map form applies there. The Compose example in the Examples section uses the
+map form for an SMTP server, username, password, and *SECURITY_EMAIL_SENDER*.
+
+Compose substitutes ``$VAR`` and ``${VAR}`` in Compose file values, and in
+double-quoted ``env_file`` values, so write a literal dollar as ``$$``.
+``"'pa$word'"`` reaches the container as ``'pa'``, with only a warning about
+an unset variable. The entrypoint does not expand the value again, so ``$$``
+is the only escaping required.
+
+Settings are written to */pgadmin4/config_distro.py* within the container (or
+to the file named by *PGADMIN_CUSTOM_CONFIG_DISTRO_FILE*), which is read after
+*/pgadmin4/config.py* and before */pgadmin4/config_local.py*. Any settings
+given will therefore override anything in config.py, but can be overridden by
+settings in config_local.py.
+
+The file is generated only when it is missing or empty, typically on first
+launch, and a non-empty file is left unchanged, including when the container
+is restarted. To apply corrected *PGADMIN_CONFIG_* values, recreate the
+container (``docker compose up -d`` does this when the environment changes,
+whereas ``docker compose restart`` does not), keeping the */var/lib/pgadmin*
+mapping to retain your data. If the file is on persistent storage, either
+because it is mapped (not recommended; use */pgadmin4/config_local.py*
+instead) or because *PGADMIN_CUSTOM_CONFIG_DISTRO_FILE* points there,
+recreating the container is not enough: edit the file, or empty it so that it
+is regenerated.
 
 See :ref:`config_py` for more information on the available configuration settings.
 
@@ -303,6 +348,37 @@ Run a simple container over port 80, setting some configuration options:
         -e 'PGADMIN_CONFIG_CONSOLE_LOG_LEVEL=10' \
         -d dpage/pgadmin4
 
+Run pgAdmin with Docker Compose, publishing port 80 and sending mail through
+an external SMTP server. *PGADMIN_DEFAULT_EMAIL* and
+*PGADMIN_DEFAULT_PASSWORD* are ordinary strings. Each *PGADMIN_CONFIG_*
+string below includes the Python quotes that YAML would otherwise remove.
+*PGADMIN_DISABLE_POSTFIX* may be any non-empty value; it is ordinary text,
+not a Python expression. The named volume keeps */var/lib/pgadmin* when the
+container is recreated:
+
+.. code-block:: yaml
+
+    services:
+      pgadmin:
+        image: dpage/pgadmin4
+        ports:
+          - "80:80"
+        environment:
+          PGADMIN_DEFAULT_EMAIL: user@domain.com
+          PGADMIN_DEFAULT_PASSWORD: SuperSecret
+          PGADMIN_DISABLE_POSTFIX: "1"
+          PGADMIN_CONFIG_MAIL_SERVER: "'mail.example.com'"
+          PGADMIN_CONFIG_MAIL_PORT: "587"
+          PGADMIN_CONFIG_MAIL_USE_TLS: "True"
+          PGADMIN_CONFIG_MAIL_USERNAME: "'smtp-user'"
+          PGADMIN_CONFIG_MAIL_PASSWORD: "'s3cret=value'"
+          PGADMIN_CONFIG_SECURITY_EMAIL_SENDER: "'pgadmin@example.com'"
+        volumes:
+          - pgadmin-data:/var/lib/pgadmin
+
+    volumes:
+      pgadmin-data:
+
 Run a TLS secured container using a shared config/storage directory in
 /private/var/lib/pgadmin on the host, and servers pre-loaded from
 /tmp/servers.json on the host:
@@ -319,6 +395,44 @@ Run a TLS secured container using a shared config/storage directory in
         -e 'PGADMIN_DEFAULT_PASSWORD=SuperSecret' \
         -e 'PGADMIN_ENABLE_TLS=True' \
         -d dpage/pgadmin4
+
+Restricted Security Contexts (OpenShift, ``--cap-drop=ALL``)
+************************************************************
+
+Some platforms refuse to honor Linux file capabilities. The two situations
+the pgAdmin container handles automatically are:
+
+- ``--cap-drop=ALL`` (or an equivalent restricted Kubernetes SecurityContext
+  such as OpenShift's ``restricted-v2`` SCC), which zeros the bounding set
+  and removes ``CAP_NET_BIND_SERVICE``. Exec of a capability-tagged binary
+  then fails with ``Operation not permitted``.
+
+- ``--security-opt=no-new-privileges`` (or
+  ``allowPrivilegeEscalation: false``), which causes the kernel to silently
+  strip file capabilities on exec. The binary runs, but a subsequent
+  ``bind()`` to a port below 1024 fails with ``EPERM``.
+
+The container's entrypoint reads ``/proc/self/status`` at startup, detects
+either condition, switches gunicorn to the non-capability python
+interpreter, and (when *PGADMIN_LISTEN_PORT* is not set) defaults the
+listen port to **8080** for plain HTTP and **8443** for TLS instead of
+80/443. A message is logged so the choice is visible.
+
+In practice this means a typical OpenShift deployment requires no special
+build, no setcap, and no custom configuration — only a Service / Route
+that targets the chosen non-privileged port:
+
+.. code-block:: bash
+
+    docker run --rm -p 8080:8080 \
+        --security-opt=no-new-privileges \
+        --cap-drop=ALL \
+        -e 'PGADMIN_DEFAULT_EMAIL=user@domain.com' \
+        -e 'PGADMIN_DEFAULT_PASSWORD=SuperSecret' \
+        dpage/pgadmin4
+
+If you explicitly set *PGADMIN_LISTEN_PORT*, that value is honored in both
+the restricted and unrestricted paths.
 
 Reverse Proxying
 ****************
@@ -526,3 +640,84 @@ the container is typically launched per the example below:
         -e "SCRIPT_NAME=/pgadmin4" \
         -l "traefik.frontend.pgadmin4.rule=Host(`host.example.com`) && PathPrefix(`/pgadmin4`)" \
         -d dpage/pgadmin4
+
+Sharing the data volume across containers (Kubernetes init containers)
+----------------------------------------------------------------------
+
+A common Kubernetes pattern is to bootstrap a pgAdmin deployment with one or
+more init containers that share the ``/var/lib/pgadmin`` volume with the main
+pgAdmin container — for example, an init container that runs
+``setup.py load-servers`` to import a ``servers.json`` definition file at
+each rollout.
+
+**The image tag of any such sidecar/init container must NOT be newer than
+the main pgAdmin container's tag.** pgAdmin's configuration database
+(``pgadmin4.db``) is migrated forward only — destructive operations such as
+dropping a column are part of normal upgrades. If an init container running
+``pgadmin4:latest`` (or any newer tag) executes ``setup.py`` against a
+``pgadmin4.db`` that the main, older pgAdmin will then read, the init
+container's migrations will advance the schema past what the main container's
+ORM understands, and the main container will fail at runtime with errors
+like ``no such column: <table>.<column>``.
+
+The safe configuration is to pin **both** the main container and every
+sidecar/init container that touches the data volume to the **same**
+explicit version tag, and upgrade them together:
+
+.. code-block:: yaml
+
+    # Deployment manifest (spec.template.spec): pin every container that
+    # touches the data volume to the same explicit tag. Do NOT use :latest.
+    spec:
+      template:
+        spec:
+          initContainers:
+            - name: import-servers-json
+              image: docker.io/dpage/pgadmin4:9.14   # match the main container
+              # ... rest of the init container spec ...
+          containers:
+            - name: pgadmin
+              image: docker.io/dpage/pgadmin4:9.14   # main pgAdmin container
+
+If you deploy pgAdmin with a Helm chart, set the equivalent image-tag values
+for both the main container and every init/sidecar container rather than the
+raw fields shown above. When upgrading pgAdmin, change every reference to the
+image tag at the same time so that the main container and any sidecar/init
+containers move forward together.
+
+Use ``strategy: Recreate``, not ``RollingUpdate``
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Even when every container's image tag is pinned correctly, **a rolling
+upgrade across pgAdmin versions is unsafe** when the old and new pods share
+a data volume. Kubernetes' default ``RollingUpdate`` strategy starts the
+new pod, waits for it to become healthy, and only *then* terminates the
+old pod. During that overlap window:
+
+1. The new pod's startup runs ``db_upgrade()`` and applies any pending
+   migrations to the shared ``pgadmin4.db`` — including destructive ones
+   (column drops, table renames, type changes).
+2. The new pod becomes healthy. The old pod is still alive and still has
+   ``pgadmin4.db`` open with its older ORM schema metadata.
+3. Until Kubernetes terminates the old pod, requests routed to it
+   generate queries that reference the pre-migration schema. Those
+   queries now fail at runtime against the migrated database — for
+   example, ``no such column: <table>.<column>`` when a column was
+   dropped in this release.
+
+Because pgAdmin's migrations are forward-only with single-step destructive
+operations (a column dropped in release N+1 is gone immediately, not after
+a deprecation cycle), there is no safe way for an N-version pod to keep
+serving against a migrated N+1 schema. Set the deployment strategy to
+``Recreate``, which terminates the old pod *before* starting the new one:
+
+.. code-block:: yaml
+
+    spec:
+      strategy:
+        type: Recreate   # not RollingUpdate
+
+The trade-off is a few seconds of downtime during each upgrade, in
+exchange for not serving traffic from a pod whose ORM is misaligned with
+the database schema underneath it. This is the supported upgrade
+strategy for pgAdmin K8s deployments today.

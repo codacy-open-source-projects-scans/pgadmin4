@@ -12,22 +12,17 @@ import {
 } from 'react';
 
 import Box from '@mui/material/Box';
-import {
-  useReactTable,
-  getCoreRowModel,
-  getSortedRowModel,
-  getFilteredRowModel,
-} from '@tanstack/react-table';
+import { useTable } from '@tanstack/react-table';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import _ from 'lodash';
 import PropTypes from 'prop-types';
 import { DndProvider } from 'react-dnd';
-import {HTML5Backend} from 'react-dnd-html5-backend';
 
+import { getDndManager } from 'sources/dnd_manager';
 import { usePgAdmin } from 'sources/PgAdminProvider';
 import {
   PgReactTable, PgReactTableBody, PgReactTableHeader,
-  PgReactTableRow, 
+  PgReactTableRow, pgTableFeatures,
 } from 'sources/components/PgReactTableStyled';
 import CustomPropTypes from 'sources/custom_prop_types';
 
@@ -96,17 +91,19 @@ export default function DataGridView({
 
   }, [options]);
 
-  const table = useReactTable({
+  const table = useTable({
+    features: pgTableFeatures,
     columns: columns|| [],
     data: value || [],
     autoResetAll: false,
     state: {
       columnVisibility: columnVisibility || {},
+      ...features.current?.tableState({options}),
     },
     columnResizeMode: 'onChange',
-    getCoreRowModel: getCoreRowModel(),
-    getSortedRowModel: getSortedRowModel(),
-    getFilteredRowModel: getFilteredRowModel(),
+    // Rows expand into detail/form panels rather than sub-rows; v9 only
+    // lets rows with sub-rows expand unless told otherwise.
+    getRowCanExpand: () => true,
   });
 
   const classList = [].concat(containerClassName);
@@ -147,7 +144,7 @@ export default function DataGridView({
       <StyleDataGridBox className={classList.join(' ')}>
         <Box className='DataGridView-grid'>
           <GridHeader tableEleRef={tableEleRef} rows={rows} />
-          <DndProvider backend={HTML5Backend}>
+          <DndProvider manager={getDndManager()}>
             <PgReactTable
               ref={tableEleRef} table={table} data-test="data-grid-view"
               tableClassName='DataGridView-table'>
