@@ -34,7 +34,59 @@ OAUTH2_AUTHORIZE = 'oauth2.authorize'
 # OAuth2 settings that legitimately live at the top level of the
 # configuration. Every other OAUTH2_* setting belongs *inside* an entry
 # of the OAUTH2_CONFIG list and is ignored if set at the top level.
-_TOP_LEVEL_OAUTH2_SETTINGS = {'OAUTH2_CONFIG', 'OAUTH2_AUTO_CREATE_USER'}
+_TOP_LEVEL_OAUTH2_SETTINGS = {'OAUTH2_CONFIG', 'OAUTH2_AUTO_CREATE_USER',
+                              'OAUTH2_AUTO_LOGIN'}
+
+
+def get_auto_login_provider():
+    """
+    Return the name of the OAuth2 provider that users should be sent to
+    without seeing the login page, or None if auto-login does not apply.
+
+    Auto-login only applies when OAUTH2_AUTO_LOGIN is enabled, OAuth2 is the
+    only authentication source, and exactly one provider is configured, as
+    otherwise the user has a choice to make on the login page.
+    """
+    if not getattr(config, 'OAUTH2_AUTO_LOGIN', False):
+        return None
+    if config.AUTHENTICATION_SOURCES != [OAUTH2]:
+        return None
+    if len(config.OAUTH2_CONFIG) != 1:
+        return None
+    return config.OAUTH2_CONFIG[0].get('OAUTH2_NAME')
+
+
+def auto_login_redirect():
+    """
+    Return a redirect to the OAuth2 provider's authorisation endpoint if the
+    login page should be skipped for this request, or None to show it.
+
+    The login page is still shown when there are flashed messages waiting
+    to be displayed (for example a failed login or a logout, which would
+    otherwise loop straight back to the provider), and when the request has
+    a no_auto_login query parameter, so an administrator can always reach it.
+    """
+    provider = get_auto_login_provider()
+    if provider is None or request.method != 'GET' or \
+            session.get('_flashes') or 'no_auto_login' in request.args:
+        return None
+
+    from pgadmin.authenticate import get_auth_sources
+    client = get_auth_sources(OAUTH2).oauth2_clients.get(provider)
+    if client is None:
+        return None
+
+    try:
+        response = client.authorize_redirect(
+            url_for(OAUTH2_AUTHORIZE, _external=True))
+    except Exception as e:
+        current_app.logger.exception(
+            'OAuth2 auto-login to provider "%s" failed: %s', provider, e)
+        return None
+
+    # The /authorize callback reads the provider from the session.
+    session['oauth2_current_client'] = provider
+    return response
 
 
 def warn_on_misplaced_oauth2_config(app):
@@ -135,6 +187,9 @@ def init_app(app):
             session.pop('oauth2_current_client', None)
             return redirect(get_safe_post_login_redirect())
         session.pop('oauth2_current_client', None)
+        # get_user_profile() may already have stored the provider's logout
+        # URL before the login failed; don't leave it for a later logout.
+        session.pop('oauth2_logout_url', None)
         logout_user()
         flash(msg, MessageType.ERROR)
         return redirect(get_safe_post_login_redirect())
@@ -156,6 +211,12 @@ def init_app(app):
         logout_user()
         for key in list(session.keys()):
             session.pop(key)
+
+        # With auto-login on, the login page would otherwise send the user
+        # straight back to the provider. A pending message stops that, so
+        # they see that they have logged out and can choose to log in again.
+        if get_auto_login_provider() is not None:
+            flash(gettext('You have been logged out.'), MessageType.INFO)
 
         if logout_url:
             return redirect(logout_url.format(
@@ -657,13 +718,10 @@ class OAuth2Authentication(BaseAuthentication):
             current_app.logger.error(error_msg)
             return False, error_msg
 
-        additional_claims = None
-        if 'OAUTH2_ADDITIONAL_CLAIMS' in self.oauth2_config[
-                self.oauth2_current_client]:
-
-            additional_claims = self.oauth2_config[
-                self.oauth2_current_client
-            ]['OAUTH2_ADDITIONAL_CLAIMS']
+        # config.py ships the key with a value of None, so test whether it
+        # is set rather than whether it is present.
+        additional_claims = self.oauth2_config.get(
+            self.oauth2_current_client, {}).get('OAUTH2_ADDITIONAL_CLAIMS')
 
         # For OIDC providers, check ID token claims first, then userinfo
         # For non-OIDC providers, check userinfo only
@@ -756,10 +814,16 @@ class OAuth2Authentication(BaseAuthentication):
 
         session['pass_enc_key'] = session['oauth2_token']['access_token']
 
-        if 'OAUTH2_LOGOUT_URL' in self.oauth2_config[
-                self.oauth2_current_client]:
-            session['oauth2_logout_url'] = self.oauth2_config[
-                self.oauth2_current_client]['OAUTH2_LOGOUT_URL']
+        # As above, the shipped config.py sets this to None, so only stash
+        # it in the session when it actually holds a URL, and otherwise drop
+        # any left over from an earlier login so that logout cannot redirect
+        # to a different provider's URL.
+        logout_url = self.oauth2_config.get(
+            self.oauth2_current_client, {}).get('OAUTH2_LOGOUT_URL')
+        if logout_url:
+            session['oauth2_logout_url'] = logout_url
+        else:
+            session.pop('oauth2_logout_url', None)
 
         # For OIDC providers, parse the ID token JWT to extract claims.
         # We can skip the userinfo endpoint call if the ID token has
@@ -816,8 +880,9 @@ class OAuth2Authentication(BaseAuthentication):
 
         # For non-OIDC providers or when ID token is insufficient,
         # call the userinfo endpoint
-        if 'OAUTH2_USERINFO_ENDPOINT' not in self.oauth2_config[
-                self.oauth2_current_client]:
+        userinfo_endpoint = self.oauth2_config.get(
+            self.oauth2_current_client, {}).get('OAUTH2_USERINFO_ENDPOINT')
+        if not userinfo_endpoint:
             if self._is_oidc_provider():
                 # OIDC provider should have provided claims in ID token
                 current_app.logger.warning(
@@ -830,8 +895,7 @@ class OAuth2Authentication(BaseAuthentication):
             return {}
 
         resp = self.oauth2_clients[self.oauth2_current_client].get(
-            self.oauth2_config[
-                self.oauth2_current_client]['OAUTH2_USERINFO_ENDPOINT'],
+            userinfo_endpoint,
             token=session['oauth2_token']
         )
         resp.raise_for_status()
